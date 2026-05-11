@@ -41,8 +41,7 @@ public class TimeSlot {
      * STUB — Phase 2: return true if startTime is within 7 days from now.
      */
     public boolean isWithinOneWeek() {
-        // TODO (Huy Dung): return !startTime.isAfter(LocalDateTime.now().plusWeeks(1));
-        return true;
+        return !startTime.isAfter(LocalDateTime.now().plusWeeks(1));
     }
 
     /**

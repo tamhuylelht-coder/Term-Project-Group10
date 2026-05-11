@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Room;
+import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
@@ -110,5 +111,71 @@ public class BookingValidatorTest {
         existing.add(existing1);
 
         assertTrue(validator.detectConflict(req, existing));
+    }
+
+    @Test
+    void testValidateAccess_AllUsers() {
+        Room room = new Room(1, "Room A", 10, AccessLevel.ALL_USERS);
+        User student = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
+        assertTrue(validator.validateAccess(room, student));
+    }
+
+    @Test
+    void testValidateAccess_StudentOnly_WithStudent() {
+        Room room = new Room(1, "Room A", 10, AccessLevel.STUDENT_ONLY);
+        User student = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
+        assertTrue(validator.validateAccess(room, student));
+    }
+
+    @Test
+    void testValidateAccess_StudentOnly_WithStaff() {
+        Room room = new Room(1, "Room A", 10, AccessLevel.STUDENT_ONLY);
+        User staff = new Staff("user2", "Staff Member", "pass", "email", "staff1", "IT");
+        assertFalse(validator.validateAccess(room, staff));
+    }
+
+    @Test
+    void testValidateAccess_StaffOnly_WithStaff() {
+        Room room = new Room(1, "Room A", 10, AccessLevel.STAFF_ONLY);
+        User staff = new Staff("user2", "Staff Member", "pass", "email", "staff1", "IT");
+        assertTrue(validator.validateAccess(room, staff));
+    }
+
+    @Test
+    void testValidateAccess_StaffOnly_WithStudent() {
+        Room room = new Room(1, "Room A", 10, AccessLevel.STAFF_ONLY);
+        User student = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
+        assertFalse(validator.validateAccess(room, student));
+    }
+
+    @Test
+    void testValidateAdvanceWindow_WithinOneWeek() {
+        LocalDateTime start = LocalDateTime.now().plusDays(3); // 3 days from now
+        LocalDateTime end = start.plusHours(2);
+        TimeSlot slot = new TimeSlot(start, end);
+        assertTrue(validator.validateAdvanceWindow(slot));
+    }
+
+    @Test
+    void testValidateAdvanceWindow_ExactlyOneWeek() {
+        LocalDateTime start = LocalDateTime.now().plusWeeks(1); // exactly 7 days from now
+        LocalDateTime end = start.plusHours(2);
+        TimeSlot slot = new TimeSlot(start, end);
+        assertTrue(validator.validateAdvanceWindow(slot));
+    }
+
+    @Test
+    void testValidateAdvanceWindow_BeyondOneWeek() {
+        LocalDateTime start = LocalDateTime.now().plusWeeks(1).plusDays(1); // 8 days from now
+        LocalDateTime end = start.plusHours(2);
+        TimeSlot slot = new TimeSlot(start, end);
+        assertFalse(validator.validateAdvanceWindow(slot));
+    }
+
+    @Test
+    void testValidateOneBookingPerDay_NoExistingBookings() {
+        User user = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
+        // Since repository is created within the method, the stub will return true for empty list
+        assertTrue(validator.validateOneBookingPerDay(user));
     }
 }
