@@ -25,7 +25,7 @@ public class TimeSlot {
      */
     public double getDurationHours() {
         // TODO (Huy Dung): return ChronoUnit.MINUTES.between(startTime, endTime) / 60.0;
-        return 1.0;
+        return java.time.Duration.between(startTime, endTime).toMinutes() / 60.0;
     }
 
     /**
@@ -34,7 +34,7 @@ public class TimeSlot {
      */
     public boolean overlapsWith(TimeSlot other) {
         // TODO (Huy Dung): return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
-        return false;
+        return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
     }
 
     /**
@@ -50,6 +50,6 @@ public class TimeSlot {
      */
     public boolean isWithinMaxDuration() {
         // TODO (Huy Dung): return getDurationHours() <= 3.0;
-        return true;
+        return getDurationHours() <= 3.0;
     }
 }
