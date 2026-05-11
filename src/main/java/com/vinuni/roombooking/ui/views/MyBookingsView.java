@@ -1,0 +1,93 @@
+package com.vinuni.roombooking.ui.views;
+
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.Route;
+import com.vinuni.roombooking.enums.BookingStatus;
+import com.vinuni.roombooking.model.BookingRequest;
+import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.repository.BookingRepository;
+import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.ui.MainLayout;
+import com.vinuni.roombooking.ui.SessionUtil;
+import com.vinuni.roombooking.ui.VaadinFrontendUI;
+
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * View 4 - My bookings. Reads from BookingRepository.findByUser() and offers
+ * per-row Cancel via BookingService.cancelBooking().
+ */
+@Route(value = "my-bookings", layout = MainLayout.class)
+@PageTitle("My Bookings")
+public class MyBookingsView extends VerticalLayout {
+
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private final BookingRepository repository;
+    private final BookingService service;
+    private final VaadinFrontendUI frontend;
+    private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
+    private final Paragraph emptyState = new Paragraph(
+            "No bookings yet. Open the Rooms page to book one.");
+
+    public MyBookingsView(BookingRepository repository,
+                          BookingService service,
+                          VaadinFrontendUI frontend) {
+        this.repository = repository;
+        this.service = service;
+        this.frontend = frontend;
+        setSizeFull();
+
+        add(new H2("My bookings"));
+
+        grid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
+        grid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
+        grid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
+                .setHeader("Start").setAutoWidth(true);
+        grid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
+                .setHeader("End").setAutoWidth(true);
+        grid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
+        grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
+        grid.setSizeFull();
+
+        add(emptyState, grid);
+        refresh();
+    }
+
+    private Button buildCancelButton(BookingRequest req) {
+        Button cancel = new Button("Cancel", e -> cancel(req));
+        cancel.addThemeVariants(ButtonVariant.LUMO_ERROR);
+        boolean already = req.getStatus() == BookingStatus.CANCELLED
+                       || req.getStatus() == BookingStatus.REJECTED;
+        cancel.setEnabled(!already);
+        return cancel;
+    }
+
+    private void refresh() {
+        User user = SessionUtil.getCurrentUser();
+        List<BookingRequest> mine = user == null
+                ? List.of()
+                : repository.findByUser(user.getUserId());
+        grid.setItems(mine);
+        emptyState.setVisible(mine.isEmpty());
+        grid.setVisible(!mine.isEmpty());
+    }
+
+    private void cancel(BookingRequest req) {
+        User user = SessionUtil.getCurrentUser();
+        boolean ok = service.cancelBooking(req.getBookingId(), user);
+        if (ok) {
+            frontend.showConfirmation("Cancelled " + req.getBookingId());
+        } else {
+            frontend.showError("Could not cancel " + req.getBookingId());
+        }
+        refresh();
+    }
+}
