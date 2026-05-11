@@ -46,7 +46,10 @@ public class BookingValidator {
      */
     public boolean validateAdvanceWindow(TimeSlot slot) {
         // TODO (Huy Dung): return slot.isWithinOneWeek();
-        return true;
+
+        
+        return slot.isWithinOneWeek();
+
     }
 
     /**
@@ -55,6 +58,17 @@ public class BookingValidator {
     public boolean validateOneBookingPerDay(User user) {
         // TODO (Huy Dung): query BookingRepository.findByUser(user.getUserId()),
         //   filter by same date as requested slot, check count == 0
+
+
+        List<BookingRequest> existingBookings = repository.findByUser(user.getUserId());
+        for (BookingRequest existing : existingBookings) {
+        // Assuming TimeSlot or BookingRequest has a getDate() method
+            if (existing.getSlot().getDate().equals(requestedSlot.getDate())) {
+                return false; // User already has a booking on this day [4]
+
+        
+
+        
         return true;
     }
 
@@ -64,6 +78,8 @@ public class BookingValidator {
      */
     public boolean validateAccess(User user, Room room) {
         // TODO (Huy Dung): switch on room.getAccess() and user's concrete type
-        return true;
+        
+        
+        return user.getAccessLevel() >= room.getAccess();
     }
 }
