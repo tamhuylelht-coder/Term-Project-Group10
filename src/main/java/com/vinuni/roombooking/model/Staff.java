@@ -12,6 +12,11 @@ public class Staff extends User implements Bookable {
         this.department  = department;
     }
 
+    @Override
+    public String getUserType() {
+        return "Staff";
+    }
+
     public String getStaffId()    { return staffId; }
     public String getDepartment() { return department; }
 

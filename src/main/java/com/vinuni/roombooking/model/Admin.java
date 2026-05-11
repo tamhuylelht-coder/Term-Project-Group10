@@ -11,6 +11,10 @@ public class Admin extends User {
     }
 
     public String getAdminId() { return adminId; }
+    @Override
+    public String getUserType() {
+        return "Admin";
+    }
 
     /**
      * STUB — Phase 2: persist a new Room via BookingRepository / DatabaseConnector.

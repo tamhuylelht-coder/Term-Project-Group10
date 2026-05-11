@@ -1,8 +1,7 @@
 package com.vinuni.roombooking.model;
 
-import com.vinuni.roombooking.model.BookingRequest;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 public abstract class User {
 
@@ -25,6 +24,8 @@ public abstract class User {
     public String getUserName() {
         return userName;
     }
+
+    public abstract String getUserType();
 
     /**
      * STUB — Phase 2: hash pwd and compare against stored hash.
