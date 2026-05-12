@@ -6,13 +6,13 @@ import java.util.HashSet;
 
 public class BookingRequest {
 
-    private String        bookingId;
-    private User          user;
-    private Room          room;
-    private TimeSlot      timeSlot;
-    private HashSet<String> rsvpList;
+    private final String        bookingId;
+    private final  User          user;
+    private final Room          room;
+    private final TimeSlot      timeSlot;
+    private final HashSet<String> rsvpList;
     private BookingStatus status;
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt;
 
     public BookingRequest(String bookingId, User user, Room room, TimeSlot timeSlot) {
         this.bookingId = bookingId;
