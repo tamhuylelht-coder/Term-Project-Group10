@@ -2,9 +2,9 @@ package com.vinuni.roombooking.model;
 
 public class Student extends User implements Bookable {
 
-    private String studentId;
-    private String major;
-    private int    yearOfStudy;
+    private final String studentId;
+    private final String major;
+    private final int    yearOfStudy;
 
     public Student(String userId, String userName, String password, String email,
                    String studentId, String major, int yearOfStudy) {
