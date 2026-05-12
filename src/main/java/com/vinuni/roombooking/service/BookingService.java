@@ -6,6 +6,8 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
 import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.Queue;
 
 /**
  * PRIMARY CONTRACT between frontend and backend.
@@ -39,18 +41,16 @@ public class BookingService {
      *          call repository.save(req) and dbConnector.insertBooking(req).
      */
     public BookingStatus submitRequest(BookingRequest req) {
-        // TODO (Huy Dung):
-        //   if (!validator.validateAccess(req.getUser(), req.getRoom())) return BookingStatus.REJECTED;
-        //   if (!validator.validateDuration(req.getTimeSlot()))           return BookingStatus.REJECTED;
-        //   if (!validator.validateAdvanceWindow(req.getTimeSlot()))      return BookingStatus.REJECTED;
-        //   if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
-        //   List<BookingRequest> existing = repository.findByRoom(req.getRoom().getRoomId());
-        //   if (validator.detectConflict(req, existing))                  return BookingStatus.REJECTED;
-        //   req.setStatus(BookingStatus.PENDING);
-        //   repository.save(req);
-        //   dbConnector.insertBooking(req);
-        //   return BookingStatus.PENDING;
-        return BookingStatus.APPROVED; // stub: always succeeds for frontend dev
+        if (!validator.validateAccess(req.getRoom(), req.getUser())) return BookingStatus.REJECTED;
+        if (!validator.validateDuration(req.getTimeSlot()))           return BookingStatus.REJECTED;
+        if (!validator.validateAdvanceWindow(req.getTimeSlot()))      return BookingStatus.REJECTED;
+        if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
+        List<BookingRequest> existing = repository.findByRoom(req.getRoom().getRoomId());
+        if (validator.detectConflict(req, existing))                  return BookingStatus.REJECTED;
+        req.setStatus(BookingStatus.PENDING);
+        repository.save(req);
+        //dbConnector.insertBooking(req);
+        return BookingStatus.APPROVED;
     }
 
     /**
@@ -60,14 +60,12 @@ public class BookingService {
      * Phase 2: verify ownership, set CANCELLED, persist.
      */
     public boolean cancelBooking(String bookingId, User user) {
-        // TODO (Huy Dung):
-        //   BookingRequest req = repository.findById(bookingId);
-        //   if (req == null) return false;
-        //   if (!req.getUser().getUserId().equals(user.getUserId()) && !(user instanceof Admin)) return false;
-        //   req.setStatus(BookingStatus.CANCELLED);
-        //   repository.save(req);
-        //   return true;
-        return true; // stub
+        BookingRequest req = repository.findById(bookingId);
+        if (req == null) return false;
+        if (!req.getUser().getUserId().equals(user.getUserId()) && !(user instanceof Admin)) return false;
+        req.setStatus(BookingStatus.CANCELLED);
+        repository.save(req);
+        return true;
     }
 
     /**
@@ -77,11 +75,9 @@ public class BookingService {
      * Phase 2: look up booking, delegate to req.addRsvp(user.getUserId()).
      */
     public boolean addRsvp(String bookingId, User user) {
-        // TODO (Huy Dung):
-        //   BookingRequest req = repository.findById(bookingId);
-        //   if (req == null) return false;
-        //   return req.addRsvp(user.getUserId());
-        return true; // stub
+        BookingRequest req = repository.findById(bookingId);
+        if (req == null) return false;
+        return req.addRsvp(user.getUserId());
     }
 
     // -------------------------------------------------------------------------
@@ -92,6 +88,31 @@ public class BookingService {
      * STUB — Phase 2: drain requestQueue and approve/reject each in order.
      */
     public void processQueue() {
-        // TODO (Huy Dung): poll requestQueue, run validators, update status, persist
+        Queue<BookingRequest> pendingQueue = repository.getPendingQueue();
+        while (!pendingQueue.isEmpty()) {
+            BookingRequest req = pendingQueue.poll();
+            
+            // Run all validators
+            if (!validator.validateAccess(req.getRoom(), req.getUser())) {
+                req.setStatus(BookingStatus.REJECTED);
+            } else if (!validator.validateDuration(req.getTimeSlot())) {
+                req.setStatus(BookingStatus.REJECTED);
+            } else if (!validator.validateAdvanceWindow(req.getTimeSlot())) {
+                req.setStatus(BookingStatus.REJECTED);
+            } else if (!validator.validateOneBookingPerDay(req.getUser())) {
+                req.setStatus(BookingStatus.REJECTED);
+            } else {
+                // Check for conflicts with existing bookings for the room
+                List<BookingRequest> existingBookings = repository.findByRoom(req.getRoom().getRoomId());
+                if (validator.detectConflict(req, existingBookings)) {
+                    req.setStatus(BookingStatus.REJECTED);
+                } else {
+                    req.setStatus(BookingStatus.APPROVED);
+                }
+            }
+            
+            // Persist the processed request
+            repository.save(req);
+        }
     }
 }
