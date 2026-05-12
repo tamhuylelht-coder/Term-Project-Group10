@@ -19,7 +19,7 @@ import com.vinuni.roombooking.ui.views.RoomListView;
 
 /**
  * Top-bar layout for all authenticated views. Redirects to LoginView when
- * no user is in the Vaadin session.
+ * no user is in {@link SessionUtil}.
  */
 public class MainLayout extends AppLayout implements BeforeEnterObserver {
 

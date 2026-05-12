@@ -1,6 +1,9 @@
-USE roombooking_db;
+-- Schema for the room booking app. Authored for MySQL; the H2 in-memory dev datasource
+-- runs it via MySQL compatibility mode (see spring.datasource.url in application.properties).
+-- Original `USE roombooking_db;` removed because in-memory H2 has no database to switch to,
+-- and missing `;` between CREATE TABLE statements have been added so the script parses.
 
-CREATE TABLE users(
+CREATE TABLE users (
     user_id VARCHAR(255) PRIMARY KEY,
     user_name VARCHAR(255) NOT NULL,
     user_password VARCHAR(255) NOT NULL,
@@ -12,17 +15,17 @@ CREATE TABLE users(
     staff_id VARCHAR(255),
     staff_department VARCHAR(255),
     admin_id VARCHAR(255)
-)
+);
 
-CREATE TABLE rooms(
+CREATE TABLE rooms (
     room_id VARCHAR(255) PRIMARY KEY,
     room_name VARCHAR(255) NOT NULL,
     capacity INT NOT NULL,
     access_level ENUM('STUDENT_ONLY', 'STAFF_ONLY', 'ALL_USERS') NOT NULL,
     room_status ENUM('AVAILABLE', 'OCCUPIED', 'MAINTENANCE') NOT NULL
-)
+);
 
-CREATE TABLE bookings(
+CREATE TABLE bookings (
     booking_id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     room_id VARCHAR(255) NOT NULL,
@@ -33,13 +36,13 @@ CREATE TABLE bookings(
 
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (room_id) REFERENCES rooms(room_id)
-)
+);
 
-CREATE TABLE rsvp(
+CREATE TABLE rsvp (
     rsvp_id INT AUTO_INCREMENT PRIMARY KEY,
     booking_id VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
 
     FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
-)
+);
