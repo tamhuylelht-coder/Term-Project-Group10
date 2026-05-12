@@ -116,8 +116,10 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         if (status == BookingStatus.REJECTED) {
             frontend.showError("Booking rejected by validator");
         } else {
-            req.setStatus(status);
-            frontend.showConfirmation("Booking " + status + "   ID " + req.getBookingId());
+            // Don't override req.getStatus() here — submitRequest sets it to PENDING
+            // when persisted; overriding with the return value would corrupt that.
+            frontend.showConfirmation("Submitted - booking ID " + req.getBookingId()
+                    + " (status: " + req.getStatus() + ")");
             getUI().ifPresent(ui -> ui.navigate("my-bookings"));
         }
     }
