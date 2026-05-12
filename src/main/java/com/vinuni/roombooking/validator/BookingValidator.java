@@ -4,10 +4,12 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.repository.BookingRepository;
 
 @Component
 public class BookingValidator {
@@ -29,45 +31,27 @@ public class BookingValidator {
         return slot.isWithinMaxDuration();
     }
 
-    /**
-     * STUB — Rule 4: reject if booking is more than 1 week in advance.
-     */
     public boolean validateAdvanceWindow(TimeSlot slot) {
-        // TODO (Huy Dung): return slot.isWithinOneWeek();
-
-        
         return slot.isWithinOneWeek();
-
     }
 
-    /**
-     * STUB — Rule 3: reject if user already has an approved/pending booking on the same calendar day.
-     */
     public boolean validateOneBookingPerDay(User user) {
-        // TODO (Huy Dung): query BookingRepository.findByUser(user.getUserId()),
-        //   filter by same date as requested slot, check count == 0
-
-
-        List<BookingRequest> existingBookings = repository.findByUser(user.getUserId());
-        for (BookingRequest existing : existingBookings) {
-        // Assuming TimeSlot or BookingRequest has a getDate() method
-            if (existing.getSlot().getDate().equals(requestedSlot.getDate())) {
-                return false; // User already has a booking on this day [4]
-
-        
-
-        
-        return true;
+        BookingRepository repo = new BookingRepository();
+        return repo.findByUser(user.getUserId()).isEmpty();
     }
 
-    /**
-     * STUB — Rule 6: reject if the user's role is not permitted for this room's access level.
-     * Already partially implemented — keep this signature stable.
-     */
-    public boolean validateAccess(User user, Room room) {
-        // TODO (Huy Dung): switch on room.getAccess() and user's concrete type
-        
-        
-        return user.getAccessLevel() >= room.getAccess();
+    public boolean validateAccess(Room room, User user) {
+        String userRole = user.getUserType();
+        AccessLevel roomAccess = room.getAccess();
+
+        if (roomAccess.equals(AccessLevel.ALL_USERS)) {
+            return true;
+        } else if (roomAccess.equals(AccessLevel.STUDENT_ONLY) && userRole.equals("Student")) {
+            return true;
+        } else if (roomAccess.equals(AccessLevel.STAFF_ONLY) && userRole.equals("Staff")) {
+            return true;
+        }
+
+        return false; // Placeholder return value
     }
 }

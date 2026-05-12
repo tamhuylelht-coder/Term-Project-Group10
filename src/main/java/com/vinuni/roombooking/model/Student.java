@@ -1,8 +1,5 @@
 package com.vinuni.roombooking.model;
 
-import com.vinuni.roombooking.enums.BookingStatus;
-import java.time.LocalDateTime;
-
 public class Student extends User implements Bookable {
 
     private String studentId;
@@ -20,6 +17,11 @@ public class Student extends User implements Bookable {
     public String getStudentId() { return studentId; }
     public String getMajor()     { return major; }
     public int    getYearOfStudy() { return yearOfStudy; }
+    
+    @Override
+    public String getUserType() {
+        return "Student";
+    }
 
     /**
      * STUB — Phase 2: build BookingRequest and delegate to BookingService.submitRequest().

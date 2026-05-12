@@ -1,18 +1,22 @@
 package com.vinuni.roombooking.ui;
 
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vinuni.roombooking.service.BookingService;
+import org.springframework.stereotype.Service;
 
 /**
- * Vaadin UI entry point. All Vaadin views extend this or wire through BookingService.
- * Frontend team (Quang Dung + Khanh An) owns this class from Phase 2 onward.
+ * Vaadin UI entry point. Acts as a cross-cutting helper for confirmation and
+ * error notifications used by every @Route view in {@code ui.views}.
  *
- * The five views to build (in order per blueprint):
- *   1. Login / authentication
- *   2. Room listing (filter by AccessLevel)
- *   3. Booking form (TimeSlot picker + submit)
- *   4. My Bookings (list + cancel)
- *   5. Admin panel (room toggle, force cancel, override)
+ * The five Phase-2 views live in {@code com.vinuni.roombooking.ui.views}:
+ *   1. LoginView          ("")            - User.authenticate()
+ *   2. RoomListView       ("rooms")       - Room.isAvailable(), Room.getAccess()
+ *   3. BookingFormView    ("book")        - BookingService.submitRequest()
+ *   4. MyBookingsView     ("my-bookings") - BookingRepository.findByUser(), BookingService.cancelBooking()
+ *   5. AdminView          ("admin")       - Admin.* + BookingRepository.getPendingQueue()
  */
+@Service
 public class VaadinFrontendUI {
 
     private final BookingService service;
@@ -26,34 +30,32 @@ public class VaadinFrontendUI {
     }
 
     /**
-     * STUB — Phase 2 (Quang Dung): render room grid filtered by AccessLevel.
-     * Calls room.isAvailable() and room.getAccess() on each Room in the list.
+     * Replaced by {@code RoomListView} (@Route("rooms")). Kept for UML parity.
      */
     public void renderRoomAvailability() {
-        // TODO (Quang Dung): build Vaadin Grid<Room>, bind isAvailable() and getAccess()
+        // See ui.views.RoomListView
     }
 
     /**
-     * STUB — Phase 2 (Quang Dung): show DateTimePicker + submit button.
-     * On submit: call service.submitRequest(req) and route to showConfirmation/showError.
+     * Replaced by {@code BookingFormView} (@Route("book")). Kept for UML parity.
      */
     public void renderBookingForm() {
-        // TODO (Quang Dung): build FormLayout, wire submit button to service.submitRequest()
+        // See ui.views.BookingFormView
     }
 
     /**
-     * STUB — Phase 2 (Quang Dung): show a Vaadin Notification with msg.
+     * Show a green success notification at the top of the page.
      */
     public void showConfirmation(String msg) {
-        // TODO (Quang Dung): Notification.show(msg, 3000, Position.TOP_CENTER);
-        System.out.println("[CONFIRM] " + msg);
+        Notification n = Notification.show(msg, 3000, Notification.Position.TOP_CENTER);
+        n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 
     /**
-     * STUB — Phase 2 (Quang Dung): show a red Vaadin Notification with msg.
+     * Show a red error notification at the top of the page.
      */
     public void showError(String msg) {
-        // TODO (Quang Dung): Notification n = Notification.show(msg); n.addThemeVariants(ERROR);
-        System.err.println("[ERROR] " + msg);
+        Notification n = Notification.show(msg, 3000, Notification.Position.TOP_CENTER);
+        n.addThemeVariants(NotificationVariant.LUMO_ERROR);
     }
 }
