@@ -56,12 +56,15 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         this.frontend = frontend;
 
         LocalDateTime baseline = LocalDateTime.now().plusHours(1).truncatedTo(ChronoUnit.HOURS);
+        // Anchor min to today's midnight so the 30-minute step lands on clean :00 / :30 slots
+        // (anchoring to LocalDateTime.now() would offset the dropdown by the current minute).
+        LocalDateTime dayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         startPicker.setValue(baseline);
         endPicker.setValue(baseline.plusHours(1));
-        startPicker.setMin(LocalDateTime.now());
-        endPicker.setMin(LocalDateTime.now());
-        startPicker.setStep(Duration.ofMinutes(30));
-        endPicker.setStep(Duration.ofMinutes(30));
+        startPicker.setMin(dayStart);
+        endPicker.setMin(dayStart);
+        startPicker.setStep(Duration.ofMinutes(15));
+        endPicker.setStep(Duration.ofMinutes(15));
 
         submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         submitBtn.addClickListener(e -> submit());
@@ -113,8 +116,10 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         if (status == BookingStatus.REJECTED) {
             frontend.showError("Booking rejected by validator");
         } else {
-            req.setStatus(status);
-            frontend.showConfirmation("Booking " + status + "   ID " + req.getBookingId());
+            // Don't override req.getStatus() here — submitRequest sets it to PENDING
+            // when persisted; overriding with the return value would corrupt that.
+            frontend.showConfirmation("Submitted - booking ID " + req.getBookingId()
+                    + " (status: " + req.getStatus() + ")");
             getUI().ifPresent(ui -> ui.navigate("my-bookings"));
         }
     }

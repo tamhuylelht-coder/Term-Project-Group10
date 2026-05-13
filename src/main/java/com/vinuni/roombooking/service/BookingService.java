@@ -1,6 +1,7 @@
 package com.vinuni.roombooking.service;
 
 import com.vinuni.roombooking.enums.BookingStatus;
+import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;

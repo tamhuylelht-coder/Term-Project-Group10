@@ -15,11 +15,24 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.ui.DemoData;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 
 /**
- * View 1 - Login. Looks up user by name via DemoData and calls
- * {@link User#authenticate(String)}. On success, stashes user in session
- * and routes to /rooms.
+ * View 1 - Login.
+ *
+ * Validates the typed credentials via Spring Security's {@link AuthenticationManager}
+ * (which delegates to the InMemoryUserDetailsManager + BCryptPasswordEncoder declared
+ * in {@code config.SecurityConfig}). On success, looks up the matching domain
+ * {@link User} (Student / Staff / Admin) from {@code DemoData} and stashes it in
+ * {@code SessionUtil} for the rest of the views to read.
+ *
+ * SecurityContextHolder bookkeeping is intentionally NOT done here because the Spring
+ * Security filter chain is permit-all and never reads the SecurityContext at the HTTP
+ * layer; view-level access control is enforced by Vaadin BeforeEnterObservers in
+ * MainLayout and AdminView reading SessionUtil.
  */
 @Route("")
 @PageTitle("Login - Room Booking")
@@ -27,10 +40,14 @@ public class LoginView extends VerticalLayout {
 
     private final DemoData demoData;
     private final VaadinFrontendUI frontend;
+    private final AuthenticationManager authenticationManager;
 
-    public LoginView(DemoData demoData, VaadinFrontendUI frontend) {
+    public LoginView(DemoData demoData,
+                     VaadinFrontendUI frontend,
+                     AuthenticationManager authenticationManager) {
         this.demoData = demoData;
         this.frontend = frontend;
+        this.authenticationManager = authenticationManager;
 
         setSizeFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
@@ -60,22 +77,37 @@ public class LoginView extends VerticalLayout {
         add(title, hint, nameField, pwdField, loginBtn);
     }
 
-    private void attemptLogin(String name, String pwd) {
-        if (name == null || name.isBlank() || pwd == null || pwd.isBlank()) {
+    private void attemptLogin(String rawName, String pwd) {
+        if (rawName == null || rawName.isBlank() || pwd == null || pwd.isBlank()) {
             frontend.showError("Enter both username and password");
             return;
         }
-        User user = demoData.lookupUser(name.trim());
-        if (user == null) {
-            frontend.showError("Unknown user");
-            return;
+        // Normalise like DemoData.lookupUser (case-insensitive).
+        String username = rawName.trim().toLowerCase();
+
+        try {
+            // Validates the password against UserDetailsService + BCryptPasswordEncoder.
+            // Throws BadCredentialsException on wrong password, UsernameNotFoundException
+            // on unknown user. We don't need the returned Authentication for anything
+            // else here.
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, pwd));
+
+            User user = demoData.lookupUser(username);
+            if (user == null) {
+                // Authenticated against Spring Security but no DemoData profile —
+                // means the two stores have drifted. Defensive guard.
+                frontend.showError("No profile found for " + username);
+                return;
+            }
+            SessionUtil.setCurrentUser(user);
+
+            frontend.showConfirmation("Welcome, " + user.getUserName());
+            getUI().ifPresent(ui -> ui.navigate("rooms"));
+        } catch (BadCredentialsException ex) {
+            frontend.showError("Wrong username or password");
+        } catch (AuthenticationException ex) {
+            frontend.showError("Could not log in: " + ex.getMessage());
         }
-        if (!user.authenticate(pwd)) {
-            frontend.showError("Wrong password");
-            return;
-        }
-        SessionUtil.setCurrentUser(user);
-        frontend.showConfirmation("Welcome, " + user.getUserName());
-        getUI().ifPresent(ui -> ui.navigate("rooms"));
     }
 }
