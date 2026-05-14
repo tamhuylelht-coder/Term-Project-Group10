@@ -75,6 +75,7 @@ public class DatabaseConnector {
             ps.setInt(3, capacity);
             ps.setString(4, access);
             ps.setString(5, status);
+            ps.executeUpdate();
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
