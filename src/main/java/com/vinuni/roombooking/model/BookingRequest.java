@@ -1,8 +1,9 @@
 package com.vinuni.roombooking.model;
 
-import com.vinuni.roombooking.enums.BookingStatus;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+
+import com.vinuni.roombooking.enums.BookingStatus;
 
 public class BookingRequest {
 
@@ -43,7 +44,6 @@ public class BookingRequest {
      * STUB — Phase 2: add userId to rsvpList, return false if already present.
      */
     public boolean addRsvp(String userId) {
-        // TODO (Huy Dung): return rsvpList.add(userId);
-        return true;
+        return rsvpList.add(userId);
     }
 }
