@@ -1,6 +1,7 @@
 package com.vinuni.roombooking.service;
 
 import com.vinuni.roombooking.model.BookingRequest;
+import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.enums.RoomStatus;
 
 import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
@@ -70,6 +71,16 @@ public class DatabaseConnector {
         }
         
     }
+
+
+    /**
+     * Possible new method to add new user to the database
+     */
+    public void insertUser(User user){
+        String userId = user.getUserId();
+        String userName = user.getUserName();
+    }
+
 
     /**
      * STUB — Phase 2 (Huy Tam): INSERT booking into bookings table.
