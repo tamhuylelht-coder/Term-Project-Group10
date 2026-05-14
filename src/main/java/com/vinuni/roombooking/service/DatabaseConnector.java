@@ -1,11 +1,13 @@
 package com.vinuni.roombooking.service;
 
 import com.vinuni.roombooking.model.BookingRequest;
+import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.enums.RoomStatus;
 
 import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.stereotype.Service;
 import java.sql.*;
 
@@ -44,8 +46,6 @@ public class DatabaseConnector {
             Class.forName("com.mysql.cj.jdbc.Driver");
             connection = DriverManager.getConnection(connectionUrl, userName, password);
 
-            Statement statement  = connection.createStatement();
-
         }
         catch (SQLException e){
             throw new IllegalStateException("Cannot connect to the database!" + e);
@@ -60,6 +60,28 @@ public class DatabaseConnector {
      * STUB — Phase 2 (Huy Tam): SELECT * FROM bookings WHERE room_id = roomId.
      * Returns null until implemented.
      */
+
+    public void insertRoom(Room room){
+        int roomId = room.getRoomId();
+        String roomName = room.getRoomName();
+        int capacity = room.getCapacity();
+        String access = room.getAccess().toString();
+        String status = room.getStatus().toString();
+
+        try{
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO rooms (room_id, room_name, capacity, access_level, room_status) VALUES (?, ?, ?, ?,?)");
+            ps.setInt(1, roomId);
+            ps.setString(2, roomName);
+            ps.setInt(3, capacity);
+            ps.setString(4, access);
+            ps.setString(5, status);
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+        
+    }
+
     public ResultSet fetchRoomSchedules(int roomId) {
         try{
             PreparedStatement ps = connection.prepareStatement("SELECT * FROM bookings WHERE room_id = ?");
@@ -98,7 +120,7 @@ public class DatabaseConnector {
 
         try{
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO bookings (booking_id, user_id, room_id, start_time, end_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                "INSERT INTO bookings (booking_id, user_id, room_id, start_time, end_time, booking_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
             ps.setString(1, bookingId);
             ps.setString(2, userId);
             ps.setInt(3, roomId);
@@ -118,7 +140,7 @@ public class DatabaseConnector {
         String newStatus = req.getStatus().toString();
 
         try{
-            PreparedStatement ps = connection.prepareStatement("UPDATE bookings SET status = ? WHERE booking_id = ?");
+            PreparedStatement ps = connection.prepareStatement("UPDATE bookings SET booking_status = ? WHERE booking_id = ?");
             ps.setString(1, newStatus);
             ps.setString(2, bookingId);
 
