@@ -1,4 +1,8 @@
 package com.vinuni.roombooking.model;
+import com.vinuni.repository.BookingRepository;
+import com.vinuni.service.BookingService;
+import com.vinuni.service.DatabaseConnector;
+
 
 public class Admin extends User {
 
@@ -21,6 +25,7 @@ public class Admin extends User {
      */
     public void addRoom(Room room) {
         // TODO (Huy Dung): call BookingRepository or DatabaseConnector to persist room
+        
     }
 
     /**
@@ -28,6 +33,7 @@ public class Admin extends User {
      */
     public void removeRoom(int roomId) {
         // TODO (Huy Dung): call repository.delete / DB DELETE
+        
     }
 
     /**
@@ -35,6 +41,7 @@ public class Admin extends User {
      */
     public void forceCancel(String bookingId) {
         // TODO (Huy Dung): call BookingService or repository directly
+        
     }
 
     /**
