@@ -18,7 +18,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE rooms (
-    room_id VARCHAR(255) PRIMARY KEY,
+    room_id INT PRIMARY KEY,
     room_name VARCHAR(255) NOT NULL,
     capacity INT NOT NULL,
     access_level ENUM('STUDENT_ONLY', 'STAFF_ONLY', 'ALL_USERS') NOT NULL,
