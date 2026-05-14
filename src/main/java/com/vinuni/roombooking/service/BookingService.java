@@ -21,13 +21,13 @@ public class BookingService {
 
     private final BookingValidator    validator;
     private final BookingRepository   repository;
-    // private final DatabaseConnector   dbConnector;
+    private final DatabaseConnector   dbConnector;
 
     public BookingService(BookingValidator validator,
-                          BookingRepository repository) { //DatabaseConnector dbConnector
+                          BookingRepository repository, DatabaseConnector dbConnector) { 
         this.validator   = validator;
         this.repository  = repository;
-        //this.dbConnector = dbConnector;
+        this.dbConnector = dbConnector;
     }
 
     // -------------------------------------------------------------------------
@@ -50,7 +50,7 @@ public class BookingService {
         if (validator.detectConflict(req, existing))                  return BookingStatus.REJECTED;
         req.setStatus(BookingStatus.PENDING);
         repository.save(req);
-        //dbConnector.insertBooking(req);
+        dbConnector.insertBooking(req); // Insert booking information into MySQL database
         return BookingStatus.APPROVED;
     }
 
@@ -66,6 +66,7 @@ public class BookingService {
         if (!req.getUser().getUserId().equals(user.getUserId()) && !(user instanceof Admin)) return false;
         req.setStatus(BookingStatus.CANCELLED);
         repository.save(req);
+        dbConnector.updateBookingStatus(req);
         return true;
     }
 
@@ -96,19 +97,25 @@ public class BookingService {
             // Run all validators
             if (!validator.validateAccess(req.getRoom(), req.getUser())) {
                 req.setStatus(BookingStatus.REJECTED);
+                dbConnector.updateBookingStatus(req);
             } else if (!validator.validateDuration(req.getTimeSlot())) {
                 req.setStatus(BookingStatus.REJECTED);
+                dbConnector.updateBookingStatus(req);
             } else if (!validator.validateAdvanceWindow(req.getTimeSlot())) {
                 req.setStatus(BookingStatus.REJECTED);
+                dbConnector.updateBookingStatus(req);
             } else if (!validator.validateOneBookingPerDay(req.getUser())) {
                 req.setStatus(BookingStatus.REJECTED);
+                dbConnector.updateBookingStatus(req);
             } else {
                 // Check for conflicts with existing bookings for the room
                 List<BookingRequest> existingBookings = repository.findByRoom(req.getRoom().getRoomId());
                 if (validator.detectConflict(req, existingBookings)) {
                     req.setStatus(BookingStatus.REJECTED);
+                    dbConnector.updateBookingStatus(req);
                 } else {
                     req.setStatus(BookingStatus.APPROVED);
+                    dbConnector.updateBookingStatus(req);
                 }
             }
             

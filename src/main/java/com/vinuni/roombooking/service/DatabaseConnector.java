@@ -3,6 +3,7 @@ package com.vinuni.roombooking.service;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.enums.RoomStatus;
 
+import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import java.sql.*;
@@ -97,7 +98,23 @@ public class DatabaseConnector {
             ps.executeUpdate();
         }
         catch(SQLException e){
-            throw new IllegalStateException("Cannot make query" + e);
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
+    public void updateBookingStatus(BookingRequest req){
+        String bookingId = req.getBookingId();
+        String newStatus = req.getStatus().toString();
+
+        try{
+            PreparedStatement ps = connection.prepareStatement("UPDATE bookings SET status = ? WHERE booking_id = ?");
+            ps.setString(1, newStatus);
+            ps.setString(2, bookingId);
+
+            ps.executeUpdate();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
         }
     }
 
@@ -114,7 +131,7 @@ public class DatabaseConnector {
             ps.executeUpdate();
         }
         catch(SQLException e){
-            throw new IllegalStateException("Cannot make query" + e);
+            throw new IllegalStateException("Cannot make query: " + e);
         }
     }
 
