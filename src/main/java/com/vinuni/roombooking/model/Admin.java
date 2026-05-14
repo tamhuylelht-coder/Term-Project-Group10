@@ -1,7 +1,7 @@
 package com.vinuni.roombooking.model;
-import com.vinuni.repository.BookingRepository;
-import com.vinuni.service.BookingService;
-import com.vinuni.service.DatabaseConnector;
+import com.vinuni.roombooking.repository.BookingRepository;
+import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.service.DatabaseConnector;
 
 
 public class Admin extends User {
