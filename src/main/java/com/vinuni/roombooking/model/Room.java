@@ -43,7 +43,6 @@ public class Room {
      * STUB — Phase 2: check status == AVAILABLE (and optionally query DB for live occupancy).
      */
     public boolean isAvailable() {
-        // TODO (Huy Dung): return status == RoomStatus.AVAILABLE;
-        return true;
+        return status == RoomStatus.AVAILABLE;
     }
 }

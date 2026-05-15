@@ -1,13 +1,16 @@
 package com.vinuni.roombooking.repository;
 
-import com.vinuni.roombooking.model.BookingRequest;
-import org.springframework.stereotype.Repository;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Repository;
+
+import com.vinuni.roombooking.enums.BookingStatus;
+import com.vinuni.roombooking.model.BookingRequest;
 
 /**
  * In-memory storage for BookingRequests.
@@ -27,10 +30,20 @@ public class BookingRepository {
      * STUB — Phase 2: add req to history, index, and queue (if PENDING).
      */
     public void save(BookingRequest req) {
-        // TODO (Huy Dung):
-        //   bookingHistory.add(req);
-        //   bookingIndex.put(req.getBookingId(), req);
-        //   if (req.getStatus() == BookingStatus.PENDING) requestQueue.offer(req);
+        BookingRequest existing = bookingIndex.get(req.getBookingId());
+        if (existing != null) {
+            bookingHistory.remove(existing);
+            if (existing.getStatus() == BookingStatus.PENDING) {
+                requestQueue.remove(existing);
+            }
+        }
+
+        bookingHistory.add(req);
+        bookingIndex.put(req.getBookingId(), req);
+
+        if (req.getStatus() == BookingStatus.PENDING) {
+            requestQueue.offer(req);
+        }
     }
 
     /**
@@ -38,8 +51,7 @@ public class BookingRepository {
      * CONTRACT (frontend must handle null): returns null if not found.
      */
     public BookingRequest findById(String id) {
-        // TODO (Huy Dung): return bookingIndex.get(id);
-        return null;
+        return bookingIndex.get(id);
     }
 
     /**
@@ -47,10 +59,9 @@ public class BookingRepository {
      * STUB — Phase 2: filter bookingHistory where req.getUser().getUserId().equals(userId).
      */
     public List<BookingRequest> findByUser(String userId) {
-        // TODO (Huy Dung): return bookingHistory.stream()
-        //   .filter(r -> r.getUser().getUserId().equals(userId))
-        //   .collect(Collectors.toList());
-        return new ArrayList<>();
+        return bookingHistory.stream()
+                .filter(r -> r.getUser().getUserId().equals(userId))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -58,20 +69,24 @@ public class BookingRepository {
      * STUB — Phase 2: filter bookingHistory where req.getRoom().getRoomId() == roomId.
      */
     public List<BookingRequest> findByRoom(int roomId) {
-        // TODO (Huy Dung): return bookingHistory.stream()
-        //   .filter(r -> r.getRoom().getRoomId() == roomId)
-        //   .collect(Collectors.toList());
-        return new ArrayList<>();
+        return bookingHistory.stream()
+                .filter(r -> r.getRoom().getRoomId() == roomId)
+                .collect(Collectors.toList());
     }
 
     /**
      * STUB — Phase 2: remove from history + index; return false if not found.
      */
     public boolean delete(String bookingId) {
-        // TODO (Huy Dung): BookingRequest req = bookingIndex.remove(bookingId);
-        //   if (req == null) return false;
-        //   bookingHistory.remove(req);
-        //   return true;
+        BookingRequest req = bookingIndex.remove(bookingId);
+        if (req == null) {
+            return false;
+        }
+
+        bookingHistory.remove(req);
+        if (req.getStatus() == BookingStatus.PENDING) {
+            requestQueue.remove(req);
+        }
         return true;
     }
 
@@ -80,7 +95,6 @@ public class BookingRepository {
      * STUB — Phase 2: return the live requestQueue.
      */
     public Queue<BookingRequest> getPendingQueue() {
-        // TODO (Huy Dung): return requestQueue;
-        return new LinkedList<>();
+        return requestQueue;
     }
 }
