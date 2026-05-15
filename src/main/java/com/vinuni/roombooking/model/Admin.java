@@ -1,4 +1,7 @@
 package com.vinuni.roombooking.model;
+import com.vinuni.roombooking.repository.BookingRepository;
+import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import java.util.List;
 import java.util.logging.Logger;
 

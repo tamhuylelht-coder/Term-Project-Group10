@@ -1,4 +1,4 @@
-package com.vinuni.roombooking.model;
+    package com.vinuni.roombooking.model;
 
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.enums.RoomStatus;
@@ -33,6 +33,10 @@ public class Room {
 
     public AccessLevel getAccess() {
         return access;
+    }
+
+    public RoomStatus getStatus(){
+        return status;
     }
 
     /**
