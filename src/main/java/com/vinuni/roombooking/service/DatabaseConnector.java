@@ -65,8 +65,8 @@ public class DatabaseConnector {
         int roomId = room.getRoomId();
         String roomName = room.getRoomName();
         int capacity = room.getCapacity();
-        String access = room.getAccess().toString();
-        String status = room.getStatus().toString();
+        String access = room.getAccess().name();
+        String status = room.getStatus().name();
 
         try{
             PreparedStatement ps = connection.prepareStatement("INSERT INTO rooms (room_id, room_name, capacity, access_level, room_status) VALUES (?, ?, ?, ?,?)");
@@ -102,7 +102,10 @@ public class DatabaseConnector {
     public void insertUser(User user){
         String userId = user.getUserId();
         String userName = user.getUserName();
+        // String password = user.getPassword();
     }
+
+
 
 
     /**
@@ -116,7 +119,7 @@ public class DatabaseConnector {
         int roomId = req.getRoom().getRoomId();
         Timestamp startTime = Timestamp.valueOf(req.getTimeSlot().getStartTime());
         Timestamp endTime = Timestamp.valueOf(req.getTimeSlot().getEndTime());
-        String status = req.getStatus().toString();
+        String status = req.getStatus().name();
         Timestamp createdAt = Timestamp.valueOf(req.getCreatedAt());
 
         try{

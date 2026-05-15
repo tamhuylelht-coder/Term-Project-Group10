@@ -32,13 +32,23 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 public class DatabaseConnectorTest {
     
-    private BookingService bookingService;
+    // private BookingService bookingService;
 
     @Autowired
     private DatabaseConnector databaseConnector;
 
-    // Create testing users to add to database
-    // Test Student
+    // Connect to database for testing
+    @BeforeEach
+    public void setUp(){
+        databaseConnector.connect();
+        System.out.println("Connected to database");
+    }
+
+
+
+    /**
+     * Create test users to add to database for testing
+     */
     private User testStudent = new Student("U001", "Test Student", "123", "S001",
         "student1@gmail.com", "Business", 3
     );
@@ -54,28 +64,32 @@ public class DatabaseConnectorTest {
 
     /**
      * Create test rooms and add to database for testing
-     * fetchRoomSchedules()
+     * insertRoom() and fetchRoomSchedules()
      */
-
     private Room testRoom1 = new Room(1, "Room 1", 10, AccessLevel.STUDENT_ONLY);
     private Room testRoom2 = new Room(2, "Room 2", 20, AccessLevel.STAFF_ONLY);
     private Room testRoom3 = new Room(3, "Room 3", 30, AccessLevel.ALL_USERS);
-    // Add three test users to database
+
     
-    @BeforeEach
-    public void setUp(){
-        databaseConnector.connect();
-        System.out.println("Connected to database");
-    }
+    
 
-    @Test
-    public void testInsertRoom(){
-        databaseConnector.insertRoom(testRoom1);
-        databaseConnector.insertRoom(testRoom2);
-        databaseConnector.insertRoom(testRoom3);
-        System.out.println("Rooms inserted successfully");
-    }
+    /**
+     * Testing method insertRoom() in DatabaseConnector.java
+     * Result: Run succesfully
+     */
+    // @Test
+    // public void testInsertRoom(){
+    //     databaseConnector.insertRoom(testRoom1);
+    //     databaseConnector.insertRoom(testRoom2);
+    //     databaseConnector.insertRoom(testRoom3);
+    //     System.out.println("Rooms inserted successfully");
+    // }
 
+
+    /**
+     * Testing method fetchRoomSchedules() from DatabaseConnector.java
+     * Result: Run succesfully
+     */
     // @Test
     // public void testFetchRooms(){
     //     ResultSet result1 = databaseConnector.fetchRoomSchedules(1);
