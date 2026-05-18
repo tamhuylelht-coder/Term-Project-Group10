@@ -44,8 +44,13 @@ public class MyBookingsView extends VerticalLayout {
         this.service = service;
         this.frontend = frontend;
         setSizeFull();
+        getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
 
-        add(new H2("My bookings"));
+        H2 heading = new H2("My bookings");
+        heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
+        add(heading);
+
+        emptyState.getStyle().set("font-size", "1.1rem");
 
         grid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
         grid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
@@ -56,6 +61,9 @@ public class MyBookingsView extends VerticalLayout {
         grid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
         grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
+        grid.getStyle()
+                .set("font-size", "1.05rem")
+                .set("--vaadin-grid-cell-padding", "1rem");
 
         add(emptyState, grid);
         refresh();
@@ -64,6 +72,7 @@ public class MyBookingsView extends VerticalLayout {
     private Button buildCancelButton(BookingRequest req) {
         Button cancel = new Button("Cancel", e -> cancel(req));
         cancel.addThemeVariants(ButtonVariant.LUMO_ERROR);
+        cancel.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         boolean already = req.getStatus() == BookingStatus.CANCELLED
                        || req.getStatus() == BookingStatus.REJECTED;
         cancel.setEnabled(!already);

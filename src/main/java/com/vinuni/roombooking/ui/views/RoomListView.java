@@ -39,17 +39,26 @@ public class RoomListView extends VerticalLayout {
     public RoomListView(DemoData demoData) {
         this.demoData = demoData;
         setSizeFull();
+        // Larger base font for filters, grid cells, etc.
+        getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
 
-        add(new H2("Rooms"));
+        H2 heading = new H2("Rooms");
+        heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
+        add(heading);
 
         accessFilter.setItems(AccessLevel.values());
         accessFilter.setPlaceholder("All access levels");
         accessFilter.setClearButtonVisible(true);
+        accessFilter.setWidth("260px");
+        accessFilter.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         accessFilter.addValueChangeListener(e -> refresh());
+        availableOnly.getStyle().set("font-size", "1.05rem");
         availableOnly.addValueChangeListener(e -> refresh());
 
         HorizontalLayout filters = new HorizontalLayout(accessFilter, availableOnly);
         filters.setAlignItems(FlexComponent.Alignment.END);
+        filters.setSpacing(true);
+        filters.getStyle().set("margin-bottom", "1rem");
         add(filters);
 
         grid.addColumn(Room::getRoomId).setHeader("ID").setAutoWidth(true);
@@ -60,6 +69,10 @@ public class RoomListView extends VerticalLayout {
                 .setHeader("Status").setAutoWidth(true);
         grid.addComponentColumn(this::buildBookButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
+        // Taller rows + larger cell font for easier reading.
+        grid.getStyle()
+                .set("font-size", "1.05rem")
+                .set("--vaadin-grid-cell-padding", "1rem");
         add(grid);
 
         refresh();
@@ -68,6 +81,7 @@ public class RoomListView extends VerticalLayout {
     private Button buildBookButton(Room room) {
         Button book = new Button("Book", e ->
                 getUI().ifPresent(ui -> ui.navigate(BookingFormView.class, room.getRoomId())));
+        book.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
         book.setEnabled(canBook(room));
         return book;
     }
