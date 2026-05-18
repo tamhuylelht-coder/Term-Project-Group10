@@ -1,14 +1,16 @@
 package com.vinuni.roombooking.service;
 
+import java.util.List;
+import java.util.Queue;
+
+import org.springframework.stereotype.Service;
+
 import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
-import org.springframework.stereotype.Service;
-import java.util.List;
-import java.util.Queue;
 
 /**
  * PRIMARY CONTRACT between frontend and backend.
