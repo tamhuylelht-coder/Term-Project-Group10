@@ -34,6 +34,10 @@ public abstract class User {
     public String getEmail() {
         return email;
     }
+
+    public String getPassword(){
+        return password;
+    }
     
     public static void setBookingRepository(com.vinuni.roombooking.repository.BookingRepository repository) {
         User.bookingRepository = repository;
