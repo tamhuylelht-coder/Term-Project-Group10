@@ -55,6 +55,12 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         this.service = service;
         this.frontend = frontend;
 
+        // Larger base font for labels / picker text / paragraph.
+        getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
+
+        heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.25em");
+        subtitle.getStyle().set("font-size", "1.1rem").set("margin-bottom", "1.5rem");
+
         LocalDateTime baseline = LocalDateTime.now().plusHours(1).truncatedTo(ChronoUnit.HOURS);
         // Anchor min to today's midnight so the 30-minute step lands on clean :00 / :30 slots
         // (anchoring to LocalDateTime.now() would offset the dropdown by the current minute).
@@ -65,16 +71,30 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         endPicker.setMin(dayStart);
         startPicker.setStep(Duration.ofMinutes(15));
         endPicker.setStep(Duration.ofMinutes(15));
+        // Wider pickers + taller controls so date/time read clearly.
+        startPicker.setWidth("320px");
+        endPicker.setWidth("320px");
+        startPicker.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
+        endPicker.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
 
         submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        submitBtn.getStyle()
+                .set("--lumo-size-m", "var(--lumo-size-l)")
+                .set("font-size", "1.1rem")
+                .set("font-weight", "600");
         submitBtn.addClickListener(e -> submit());
 
         Button back = new Button("Back to rooms",
                 e -> getUI().ifPresent(ui -> ui.navigate("rooms")));
+        back.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
 
-        add(heading, subtitle,
-                new HorizontalLayout(startPicker, endPicker),
-                new HorizontalLayout(submitBtn, back));
+        HorizontalLayout pickerRow = new HorizontalLayout(startPicker, endPicker);
+        pickerRow.setSpacing(true);
+        HorizontalLayout buttonRow = new HorizontalLayout(submitBtn, back);
+        buttonRow.setSpacing(true);
+        buttonRow.getStyle().set("margin-top", "1rem");
+
+        add(heading, subtitle, pickerRow, buttonRow);
     }
 
     @Override

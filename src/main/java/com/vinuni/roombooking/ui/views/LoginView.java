@@ -52,23 +52,38 @@ public class LoginView extends VerticalLayout {
         setSizeFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
         setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        // Larger base font for everything in this view (labels, inputs, hint).
+        getStyle().set("font-size", "var(--lumo-font-size-l)");
 
         H1 title = new H1("VinUni Room Booking");
+        title.getStyle().set("font-size", "3rem").set("margin-bottom", "0.25em");
         Paragraph hint = new Paragraph(
                 "Demo accounts (password \"pass\"): alice (student), bob (staff), carol (admin).");
-        hint.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        hint.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "1.05rem")
+                .set("margin-bottom", "1.5rem");
+
+        // Field width bumped 320 -> 440. Taller inputs via --lumo-size-l.
+        String fieldWidth = "440px";
 
         TextField nameField = new TextField("Username");
-        nameField.setWidth("320px");
+        nameField.setWidth(fieldWidth);
+        nameField.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         nameField.setRequired(true);
         nameField.focus();
 
         PasswordField pwdField = new PasswordField("Password");
-        pwdField.setWidth("320px");
+        pwdField.setWidth(fieldWidth);
+        pwdField.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         pwdField.setRequired(true);
 
         Button loginBtn = new Button("Log in");
-        loginBtn.setWidth("320px");
+        loginBtn.setWidth(fieldWidth);
+        loginBtn.getStyle()
+                .set("--lumo-size-m", "var(--lumo-size-l)")
+                .set("font-size", "1.1rem")
+                .set("font-weight", "600");
         loginBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         loginBtn.addClickShortcut(Key.ENTER);
         loginBtn.addClickListener(e ->
