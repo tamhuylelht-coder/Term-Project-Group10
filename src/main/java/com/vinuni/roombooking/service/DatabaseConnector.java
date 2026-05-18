@@ -3,6 +3,9 @@ package com.vinuni.roombooking.service;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.model.Student;
+import com.vinuni.roombooking.model.Staff;
+import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.enums.RoomStatus;
 
 import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
@@ -102,7 +105,72 @@ public class DatabaseConnector {
     public void insertUser(User user){
         String userId = user.getUserId();
         String userName = user.getUserName();
-        // String password = user.getPassword();
+        String password = user.getPassword();
+        String email = user.getEmail();
+        if(user instanceof Student){
+            String role = "STUDENT";
+            String studentId = ((Student)user).getStudentId();
+            String major = ((Student)user).getMajor();
+            int yearOfStudy = ((Student)user).getYearOfStudy();
+            try{
+                PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO users (user_id, user_name, user_password, user_email, user_role, student_id, student_major, year_of_study) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                ps.setString(1, userId);
+                ps.setString(2, userName);
+                ps.setString(3, password);
+                ps.setString(4, email);
+                ps.setString(5, role);
+                ps.setString(6, studentId);
+                ps.setString(7, major);
+                ps.setInt(8, yearOfStudy);
+                ps.executeUpdate();
+            }
+            catch(SQLException e){
+                throw new IllegalStateException("Cannot make query:" + e);
+            }
+        }
+        else if(user instanceof Staff){
+            String role = "STAFF";
+            String staffId = ((Staff)user).getStaffId();
+            String department = ((Staff)user).getDepartment();
+            try{
+                PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO users (user_id, user_name, user_password, user_email, user_role, staff_id, staff_department) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                );
+                ps.setString(1, userId);
+                ps.setString(2, userName);
+                ps.setString(3, password);
+                ps.setString(4, email);
+                ps.setString(5, role);
+                ps.setString(6, staffId);
+                ps.setString(7, department);
+                ps.executeUpdate();
+            }
+            catch(SQLException e){
+                throw new IllegalStateException("Cannot make query:" + e);
+            }
+        }
+        else if(user instanceof Admin){
+            String role = "ADMIN";
+            String adminId = ((Admin)user).getAdminId();
+            try{
+                PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO users (user_id, user_name, user_password, user_email, user_role, admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                ps.setString(1, userId);
+                ps.setString(2, userName);
+                ps.setString(3, password);
+                ps.setString(4, email);
+                ps.setString(5, role);
+                ps.setString(6, adminId);
+                ps.executeUpdate();
+            }
+            catch(SQLException e){
+                throw new IllegalStateException("Cannot make query:" + e);
+            }
+        }
+        
     }
 
 
