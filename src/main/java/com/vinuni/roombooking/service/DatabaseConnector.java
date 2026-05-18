@@ -173,7 +173,51 @@ public class DatabaseConnector {
         
     }
 
+    public ResultSet findUserByName(String name){
+        try{
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM users WHERE user_name = ?");
+            ps.setString(1,name);
+            return ps.executeQuery();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: "+ e);
+        }
+    }
 
+    public ResultSet findUserAuthByName(String name){
+        try{
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT user_password FROM users WHERE user_name = ?");
+            ps.setString(1, name);
+            return ps.executeQuery();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
+    public ResultSet findAllRooms(){
+        try{
+            PreparedStatement ps = connection.prepareStatement("SELECT * FROM rooms");
+            return ps.executeQuery();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
+    public ResultSet findRoomById(int roomId){
+        try{
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM rooms WHERE room_id = ?");
+            ps.setInt(1, roomId);
+            return ps.executeQuery();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    };
 
 
     /**
