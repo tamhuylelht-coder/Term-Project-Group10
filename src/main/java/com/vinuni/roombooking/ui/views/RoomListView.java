@@ -17,10 +17,11 @@ import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.User;
-import com.vinuni.roombooking.ui.DemoData;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -31,25 +32,34 @@ import java.util.List;
 @PageTitle("Rooms")
 public class RoomListView extends VerticalLayout {
 
-    private final DemoData demoData;
+    private final DatabaseConnector db;
     private final Grid<Room> grid = new Grid<>(Room.class, false);
     private final ComboBox<AccessLevel> accessFilter = new ComboBox<>("Access");
     private final Checkbox availableOnly = new Checkbox("Available only", true);
 
-    public RoomListView(DemoData demoData) {
-        this.demoData = demoData;
+    public RoomListView(DatabaseConnector db) {
+        this.db = db;
         setSizeFull();
+        // Larger base font for filters, grid cells, etc.
+        getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
 
-        add(new H2("Rooms"));
+        H2 heading = new H2("Rooms");
+        heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
+        add(heading);
 
         accessFilter.setItems(AccessLevel.values());
         accessFilter.setPlaceholder("All access levels");
         accessFilter.setClearButtonVisible(true);
+        accessFilter.setWidth("260px");
+        accessFilter.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         accessFilter.addValueChangeListener(e -> refresh());
+        availableOnly.getStyle().set("font-size", "1.05rem");
         availableOnly.addValueChangeListener(e -> refresh());
 
         HorizontalLayout filters = new HorizontalLayout(accessFilter, availableOnly);
         filters.setAlignItems(FlexComponent.Alignment.END);
+        filters.setSpacing(true);
+        filters.getStyle().set("margin-bottom", "1rem");
         add(filters);
 
         grid.addColumn(Room::getRoomId).setHeader("ID").setAutoWidth(true);
@@ -60,6 +70,10 @@ public class RoomListView extends VerticalLayout {
                 .setHeader("Status").setAutoWidth(true);
         grid.addComponentColumn(this::buildBookButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
+        // Taller rows + larger cell font for easier reading.
+        grid.getStyle()
+                .set("font-size", "1.05rem")
+                .set("--vaadin-grid-cell-padding", "1rem");
         add(grid);
 
         refresh();
@@ -68,6 +82,7 @@ public class RoomListView extends VerticalLayout {
     private Button buildBookButton(Room room) {
         Button book = new Button("Book", e ->
                 getUI().ifPresent(ui -> ui.navigate(BookingFormView.class, room.getRoomId())));
+        book.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
         book.setEnabled(canBook(room));
         return book;
     }
@@ -75,7 +90,9 @@ public class RoomListView extends VerticalLayout {
     private void refresh() {
         AccessLevel level = accessFilter.getValue();
         boolean onlyAvail = Boolean.TRUE.equals(availableOnly.getValue());
-        List<Room> filtered = demoData.getRooms().stream()
+        List<Room> all = db.findAllRooms();
+        if (all == null) all = Collections.emptyList();
+        List<Room> filtered = all.stream()
                 .filter(r -> level == null || r.getAccess() == level)
                 .filter(r -> !onlyAvail || r.isAvailable())
                 .toList();

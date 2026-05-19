@@ -25,11 +25,14 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
 
     public MainLayout() {
         H2 title = new H2("VinUni Room Booking");
-        title.getStyle().set("margin", "0 1rem").set("font-size", "1.2rem");
+        title.getStyle()
+                .set("margin", "0 1.5rem")
+                .set("font-size", "1.5rem")
+                .set("font-weight", "600");
 
         HorizontalLayout nav = new HorizontalLayout(
-                new RouterLink("Rooms", RoomListView.class),
-                new RouterLink("My Bookings", MyBookingsView.class)
+                styledNav(new RouterLink("Rooms", RoomListView.class)),
+                styledNav(new RouterLink("My Bookings", MyBookingsView.class))
         );
         nav.setSpacing(true);
 
@@ -37,9 +40,17 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         header.setWidthFull();
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        header.getStyle().set("padding", "0 1rem");
+        header.getStyle()
+                .set("padding", "0.5rem 1.5rem")
+                .set("font-size", "1.1rem");
 
         addToNavbar(header);
+    }
+
+    /** Slightly larger nav links so the top bar reads easily. */
+    private RouterLink styledNav(RouterLink link) {
+        link.getStyle().set("font-size", "1.1rem").set("font-weight", "500");
+        return link;
     }
 
     private HorizontalLayout buildUserMenu() {
@@ -49,14 +60,19 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
 
         User user = SessionUtil.getCurrentUser();
         if (user != null) {
-            menu.add(new Span("Hello, " + user.getUserName()));
+            Span greeting = new Span("Hello, " + user.getUserName());
+            greeting.getStyle().set("font-size", "1.05rem");
+            menu.add(greeting);
             if (user instanceof Admin) {
-                menu.add(new RouterLink("Admin", AdminView.class));
+                RouterLink adminLink = new RouterLink("Admin", AdminView.class);
+                adminLink.getStyle().set("font-size", "1.1rem").set("font-weight", "500");
+                menu.add(adminLink);
             }
             Button logout = new Button("Logout", e -> {
                 SessionUtil.logout();
                 e.getSource().getUI().ifPresent(ui -> ui.navigate(LoginView.class));
             });
+            logout.getStyle().set("font-size", "1.05rem");
             logout.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
             menu.add(logout);
         }

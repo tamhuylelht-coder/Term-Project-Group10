@@ -1,4 +1,7 @@
 package com.vinuni.roombooking.model;
+import com.vinuni.roombooking.repository.BookingRepository;
+import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -22,9 +25,13 @@ public class Admin extends User {
     }
 
     public String getAdminId() { return adminId; }
-    
+
     public void setDatabaseConnector(DatabaseConnector connector) {
         this.databaseConnector = connector;
+    }
+
+    public void setBookingRepository(BookingRepository repository) {
+        this.bookingRepository = repository;
     }
 
     @Override

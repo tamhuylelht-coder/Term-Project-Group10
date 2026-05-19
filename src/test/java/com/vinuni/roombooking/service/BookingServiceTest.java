@@ -30,6 +30,10 @@ import static org.mockito.Mockito.when;
  */
 public class BookingServiceTest {
 
+    @Mock
+    private DatabaseConnector mockDatabaseConnector;
+
+    @Mock
     private BookingService bookingService;
 
     @Mock
@@ -47,7 +51,7 @@ public class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingService(mockValidator, mockRepository);
+        bookingService = new BookingService(mockValidator, mockRepository, mockDatabaseConnector);
 
         // Set up test data
         testStudent = new Student("user1", "John Doe", "password", "john@email.com", "stu001", "CS", 3);

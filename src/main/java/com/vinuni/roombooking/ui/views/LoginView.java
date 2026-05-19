@@ -12,7 +12,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vinuni.roombooking.model.User;
-import com.vinuni.roombooking.ui.DemoData;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,10 +24,10 @@ import org.springframework.security.core.AuthenticationException;
  * View 1 - Login.
  *
  * Validates the typed credentials via Spring Security's {@link AuthenticationManager}
- * (which delegates to the InMemoryUserDetailsManager + BCryptPasswordEncoder declared
- * in {@code config.SecurityConfig}). On success, looks up the matching domain
- * {@link User} (Student / Staff / Admin) from {@code DemoData} and stashes it in
- * {@code SessionUtil} for the rest of the views to read.
+ * (which delegates to the DB-backed UserDetailsService + BCryptPasswordEncoder declared
+ * in {@code config.SecurityConfig}). On success, loads the matching domain
+ * {@link User} (Student / Staff / Admin) from {@link DatabaseConnector#findUserByName(String)}
+ * and stashes it in {@code SessionUtil} for the rest of the views to read.
  *
  * SecurityContextHolder bookkeeping is intentionally NOT done here because the Spring
  * Security filter chain is permit-all and never reads the SecurityContext at the HTTP
@@ -38,37 +38,52 @@ import org.springframework.security.core.AuthenticationException;
 @PageTitle("Login - Room Booking")
 public class LoginView extends VerticalLayout {
 
-    private final DemoData demoData;
+    private final DatabaseConnector db;
     private final VaadinFrontendUI frontend;
     private final AuthenticationManager authenticationManager;
 
-    public LoginView(DemoData demoData,
+    public LoginView(DatabaseConnector db,
                      VaadinFrontendUI frontend,
                      AuthenticationManager authenticationManager) {
-        this.demoData = demoData;
+        this.db = db;
         this.frontend = frontend;
         this.authenticationManager = authenticationManager;
 
         setSizeFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
         setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        // Larger base font for everything in this view (labels, inputs, hint).
+        getStyle().set("font-size", "var(--lumo-font-size-l)");
 
         H1 title = new H1("VinUni Room Booking");
+        title.getStyle().set("font-size", "3rem").set("margin-bottom", "0.25em");
         Paragraph hint = new Paragraph(
                 "Demo accounts (password \"pass\"): alice (student), bob (staff), carol (admin).");
-        hint.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        hint.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "1.05rem")
+                .set("margin-bottom", "1.5rem");
+
+        // Field width bumped 320 -> 440. Taller inputs via --lumo-size-l.
+        String fieldWidth = "440px";
 
         TextField nameField = new TextField("Username");
-        nameField.setWidth("320px");
+        nameField.setWidth(fieldWidth);
+        nameField.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         nameField.setRequired(true);
         nameField.focus();
 
         PasswordField pwdField = new PasswordField("Password");
-        pwdField.setWidth("320px");
+        pwdField.setWidth(fieldWidth);
+        pwdField.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         pwdField.setRequired(true);
 
         Button loginBtn = new Button("Log in");
-        loginBtn.setWidth("320px");
+        loginBtn.setWidth(fieldWidth);
+        loginBtn.getStyle()
+                .set("--lumo-size-m", "var(--lumo-size-l)")
+                .set("font-size", "1.1rem")
+                .set("font-weight", "600");
         loginBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         loginBtn.addClickShortcut(Key.ENTER);
         loginBtn.addClickListener(e ->
@@ -82,8 +97,7 @@ public class LoginView extends VerticalLayout {
             frontend.showError("Enter both username and password");
             return;
         }
-        // Normalise like DemoData.lookupUser (case-insensitive).
-        String username = rawName.trim().toLowerCase();
+        String username = rawName.trim();
 
         try {
             // Validates the password against UserDetailsService + BCryptPasswordEncoder.
@@ -93,15 +107,15 @@ public class LoginView extends VerticalLayout {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, pwd));
 
-            User user = demoData.lookupUser(username);
+            User user = db.findUserByName(username);
             if (user == null) {
-                // Authenticated against Spring Security but no DemoData profile —
-                // means the two stores have drifted. Defensive guard.
+                // Authenticated against Spring Security but no row in the users table —
+                // means the two reads have drifted. Defensive guard.
                 frontend.showError("No profile found for " + username);
                 return;
             }
-            SessionUtil.setCurrentUser(user);
 
+            SessionUtil.setCurrentUser(user);
             frontend.showConfirmation("Welcome, " + user.getUserName());
             getUI().ifPresent(ui -> ui.navigate("rooms"));
         } catch (BadCredentialsException ex) {
