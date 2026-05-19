@@ -9,6 +9,8 @@ import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Admin;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,7 +117,37 @@ public class DatabaseConnectorTest {
     //     System.out.println("Users inserted successfully");
     // }
 
-    
+    /**
+     * Testing method findUserByName()
+     * Result
+     */
+    @Test
+    public void testFindUserByName(){
+        String name = "Test Student";
+        String name2 = "Test Student 2";
+
+        try{
+            ResultSet rs = databaseConnector.findUserByName(name);
+            ResultSet rs2 = databaseConnector.findUserByName(name2);
+
+            // Print the result of the first name
+            if(rs.next()){
+                System.out.println("User found, user has id: " + rs.getString("user_id"));
+            }
+            else{System.out.println("No user found");}
+
+            // Print the result 
+            if(rs2.next()){
+                System.out.println("User found, user has id: " + rs2.getString("user_id"));
+            }
+            else{System.out.println("No user found");}
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+        
+
+    }
 
     
     
