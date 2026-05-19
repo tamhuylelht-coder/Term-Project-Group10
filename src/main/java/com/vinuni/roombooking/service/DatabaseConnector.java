@@ -15,6 +15,8 @@ import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.stereotype.Service;
 import java.sql.*;
 
+import java.util.List;
+import java.util.ArrayList;
 
 
 /**
@@ -227,10 +229,25 @@ public class DatabaseConnector {
         }
     }
 
-    public ResultSet findAllRooms(){
+    public List<Room> findAllRooms(){
         try{
             PreparedStatement ps = connection.prepareStatement("SELECT * FROM rooms");
-            return ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
+            List<Room> roomList = new ArrayList<>();
+            while(rs.next()){
+                int roomId = rs.getInt("room_id");
+                String roomName = rs.getString("room_name");
+                int capacity = rs.getInt("capacity");
+                AccessLevel access = AccessLevel.valueOf(rs.getString("access_level"));
+                RoomStatus status = RoomStatus.valueOf(rs.getString("room_status"));
+                
+                Room returnRoom = new Room(roomId, roomName, capacity, access);
+                returnRoom.setStatus(status);
+
+                roomList.add(returnRoom);
+            }
+
+            return roomList;
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
