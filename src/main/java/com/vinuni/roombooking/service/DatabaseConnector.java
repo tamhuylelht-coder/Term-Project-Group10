@@ -156,7 +156,7 @@ public class DatabaseConnector {
             String adminId = ((Admin)user).getAdminId();
             try{
                 PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO users (user_id, user_name, user_password, user_email, user_role, admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO users (user_id, user_name, user_password, user_email, user_role, admin_id) VALUES (?, ?, ?, ?, ?, ?)"
                 );
                 ps.setString(1, userId);
                 ps.setString(2, userName);
@@ -217,7 +217,7 @@ public class DatabaseConnector {
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
         }
-    };
+    }
 
 
     /**
@@ -253,7 +253,7 @@ public class DatabaseConnector {
 
     public void updateBookingStatus(BookingRequest req){
         String bookingId = req.getBookingId();
-        String newStatus = req.getStatus().toString();
+        String newStatus = req.getStatus().name();
 
         try{
             PreparedStatement ps = connection.prepareStatement("UPDATE bookings SET booking_status = ? WHERE booking_id = ?");
