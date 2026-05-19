@@ -9,6 +9,8 @@ import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Admin;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,6 +103,149 @@ public class DatabaseConnectorTest {
     //     System.out.println(result2);
     //     System.out.println(result3);
     // }
+
+    /**
+     * Testing method insertUser() in DatabaseConnector.java
+     * Result: Insert user in database successfully
+     */
+    // @Test
+    // public void testInsertUser(){
+    //     databaseConnector.insertUser(testStudent);
+    //     databaseConnector.insertUser(testStaff);
+    //     databaseConnector.insertUser(testAdmin);
+
+    //     System.out.println("Users inserted successfully");
+    // }
+
+    /**
+     * Testing method findUserByName()
+     * Result: Successful
+     */
+    // @Test
+    // public void testFindUserByName(){
+    //     String name = "Test Student";
+    //     String name2 = "Test Student 2";
+
+    //     try{
+    //         ResultSet rs = databaseConnector.findUserByName(name);
+    //         ResultSet rs2 = databaseConnector.findUserByName(name2);
+
+    //         // Print the result of the first name
+    //         if(rs.next()){
+    //             System.out.println("User found, user has id: " + rs.getString("user_id"));
+    //         }
+    //         else{System.out.println("No user found");}
+
+    //         // Print the result 
+    //         if(rs2.next()){
+    //             System.out.println("User found, user has id: " + rs2.getString("user_id"));
+    //         }
+    //         else{System.out.println("No user found");}
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+        
+
+    // }
+
+    /**
+     * Testing method findUserAuthByName() from DatabaseConnector.java
+     * Result: Successful
+     */
+    // @Test
+    // public void testFindUserAuthByName(){
+    //     String name = "Test Staff";
+    //     String name2 = "Test Staff 2";
+
+    //     try{
+    //         ResultSet rs = databaseConnector.findUserAuthByName(name);
+    //         ResultSet rs2 = databaseConnector.findUserAuthByName(name2);
+
+    //         //Print the output of the first name
+    //         if(rs.next()){
+    //             System.out.println("User found, user has password: " + rs.getString("user_password"));
+    //         }
+    //         else{System.out.println("User not found");}
+
+    //         //Print the output of the second name
+    //         if(rs2.next()){
+    //             System.out.println("User found, user has password: " + rs2.getString("user_password"));   
+    //         }
+    //         else{System.out.println("User not found");}
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
     
+    /**
+     * Testing findAllRooms() from DatabaseConnector.java
+     * Result: Successful
+     */
+    // @Test
+    // public void testFindAllRooms(){
+    //     try{
+    //         ResultSet rs = databaseConnector.findAllRooms();
+    //         while(rs.next()){
+    //             System.out.println("---------------------------------------------------------------");
+    //             System.out.println("This is room " + rs.getInt("room_id"));
+    //             System.out.println("Room " + rs.getInt("room_id") + " can store " + rs.getInt("capacity") + " people");
+    //             System.out.println("This room is currently " + rs.getString("room_status"));
+    //             if(rs.getString("access_level").equals("STUDENT_ONLY")){
+    //                 System.out.println("Only student can book this room");
+    //             }
+    //             else if(rs.getString("access_level").equals("STAFF_ONLY")){
+    //                 System.out.println("Only staff can book this room");
+    //             }
+    //             else if(rs.getString("access_level").equals("ALL_USERS")){
+    //                 System.out.println("Both student and staff can book this room");
+    //             }
+    //             System.out.println("--------------------------------------------------------------");
+    //         }
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
+
+    /**
+     * Testing findRoomById() in DatabaseConnector.java
+     * Result: Success
+     */
+    // @Test
+    // public void testFindRoomById(){
+    //     int id = 1;
+    //     int id2 = 2;
+    //     int id3 = 4;
+
+    //     try{
+    //         ResultSet rs = databaseConnector.findRoomById(id);
+    //         ResultSet rs2 = databaseConnector.findRoomById(id2);
+    //         ResultSet rs3 = databaseConnector.findRoomById(id3);
+
+    //         //Print the output for id
+    //         if(rs.next()){
+    //             System.out.println("Room id " + id + " found, this room name is " + rs.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+
+    //         //Print the output for id2
+    //         if(rs2.next()){
+    //             System.out.println("Room id " + id2 + " found, this room name is " + rs2.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+
+    //         //Print the output for id3
+    //         if(rs3.next()){
+    //             System.out.println("Room id " + id3 + " found, this room name is " + rs3.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+                
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
     
 }
