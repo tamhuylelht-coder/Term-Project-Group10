@@ -173,12 +173,41 @@ public class DatabaseConnector {
         
     }
 
-    public ResultSet findUserByName(String name){
+    public User findUserByName(String name){
         try{
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT * FROM users WHERE user_name = ?");
             ps.setString(1,name);
-            return ps.executeQuery();
+            ResultSet rs =  ps.executeQuery();
+
+            if(!rs.next()){
+                return null;
+            }
+
+            String userId = rs.getString("user_id");
+            String userName = rs.getString("user_name");
+            String password = rs.getString("user_password");
+            String email = rs.getString("user_email");
+            String role = rs.getString("user_role");
+            if(role.equals("STUDENT")){
+                String studentId = rs.getString("student_id");
+                String major = rs.getString("student_major");
+                int yearOfStudy = rs.getInt("year_of_study");
+
+                return new Student(userId, userName, password, email, studentId, major, yearOfStudy);
+            }
+            else if(role.equals("STAFF")){
+                String staffId = rs.getString("staff_id");
+                String department=  rs.getString("staff_department");
+
+                return new Staff(userId, userName, password, email, staffId, department);
+            }
+            else if(role.equals("ADMIN")){
+                String adminId = rs.getString("admin_id");
+
+                return new Admin(userId, userName, password, email, adminId);
+            }
+            else{return null;}
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: "+ e);
