@@ -7,6 +7,7 @@ import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.enums.RoomStatus;
+import com.vinuni.roombooking.enums.AccessLevel;
 
 import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
 import org.springframework.beans.factory.annotation.Value;
@@ -236,12 +237,23 @@ public class DatabaseConnector {
         }
     }
 
-    public ResultSet findRoomById(int roomId){
+    public Room findRoomById(int roomId){
         try{
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT * FROM rooms WHERE room_id = ?");
             ps.setInt(1, roomId);
-            return ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
+
+            if(!rs.next()){return null;}
+
+            String roomName = rs.getString("room_name");
+            int capacity = rs.getInt("capacity");
+            AccessLevel access = AccessLevel.valueOf(rs.getString("access_level"));
+            RoomStatus status = RoomStatus.valueOf(rs.getString("room_status"));
+            
+            Room returnRoom = new Room(roomId, roomName, capacity, access);
+            returnRoom.setStatus(status);
+            return returnRoom;
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
