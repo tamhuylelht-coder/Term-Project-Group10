@@ -18,7 +18,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE rooms (
-    room_id INT PRIMARY KEY,
+    room_id INT PRIMARY KEY AUTO_INCREMENT,
     room_name VARCHAR(255) NOT NULL,
     capacity INT NOT NULL,
     access_level ENUM('STUDENT_ONLY', 'STAFF_ONLY', 'ALL_USERS') NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE rooms (
 CREATE TABLE bookings (
     booking_id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
+    room_id INT NOT NULL,
     start_time DATETIME NOT NULL,
     end_time DATETIME NOT NULL,
     booking_status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED') NOT NULL,
