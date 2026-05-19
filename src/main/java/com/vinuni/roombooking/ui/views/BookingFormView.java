@@ -18,7 +18,7 @@ import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.service.BookingService;
-import com.vinuni.roombooking.ui.DemoData;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
@@ -38,7 +38,7 @@ import java.util.UUID;
 @PageTitle("Book a room")
 public class BookingFormView extends VerticalLayout implements HasUrlParameter<Integer> {
 
-    private final DemoData demoData;
+    private final DatabaseConnector db;
     private final BookingService service;
     private final VaadinFrontendUI frontend;
 
@@ -50,8 +50,8 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
 
     private Room room;
 
-    public BookingFormView(DemoData demoData, BookingService service, VaadinFrontendUI frontend) {
-        this.demoData = demoData;
+    public BookingFormView(DatabaseConnector db, BookingService service, VaadinFrontendUI frontend) {
+        this.db = db;
         this.service = service;
         this.frontend = frontend;
 
@@ -105,7 +105,7 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
             submitBtn.setEnabled(false);
             return;
         }
-        this.room = demoData.lookupRoom(roomId);
+        this.room = db.findRoomById(roomId);
         if (room == null) {
             heading.setText("Room " + roomId + " not found");
             submitBtn.setEnabled(false);

@@ -8,10 +8,12 @@ import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.enums.AccessLevel;
+import com.vinuni.roombooking.repository.BookingRepository;
 
-import org.hibernate.engine.jdbc.mutation.group.PreparedStatementDetails;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.sql.*;
 
@@ -38,15 +40,19 @@ public class DatabaseConnector {
     @Value("${spring.datasource.url}")
     private String     connectionUrl;
 
+    /** Used to wire Admin's deps when reconstructing one from a DB row. */
+    @Autowired
+    private BookingRepository bookingRepository;
 
-    /**
-     * STUB — Phase 2 (Huy Tam): open JDBC connection using connectionUrl.
-     */
+    /** Hash user passwords before storing so SecurityConfig's BCrypt check succeeds at login. */
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * Code referenced from stackoverflow: https://stackoverflow.com/questions/2839321/connect-java-to-a-mysql-database
      * and geeksforgeeks: https://www.geeksforgeeks.org/java/java-database-connectivity-with-mysql/
      */
+    @PostConstruct
     public void connect() {
         try{
             Class.forName("com.mysql.cj.jdbc.Driver");
@@ -103,12 +109,14 @@ public class DatabaseConnector {
 
 
     /**
-     * Possible new method to add new user to the database
+     * Persist a new User. The raw password from the User object is BCrypt-hashed
+     * before storage so that SecurityConfig's BCrypt-based AuthenticationManager
+     * can match it on login.
      */
     public void insertUser(User user){
         String userId = user.getUserId();
         String userName = user.getUserName();
-        String password = user.getPassword();
+        String password = passwordEncoder.encode(user.getPassword());
         String email = user.getEmail();
         if(user instanceof Student){
             String role = "STUDENT";
@@ -207,8 +215,11 @@ public class DatabaseConnector {
             }
             else if(role.equals("ADMIN")){
                 String adminId = rs.getString("admin_id");
-
-                return new Admin(userId, userName, password, email, adminId);
+                Admin admin = new Admin(userId, userName, password, email, adminId);
+                // Wire deps so AdminView's forceCancel / overrideRequest work.
+                admin.setDatabaseConnector(this);
+                admin.setBookingRepository(bookingRepository);
+                return admin;
             }
             else{return null;}
         }
@@ -220,7 +231,7 @@ public class DatabaseConnector {
     public List<String> findUserAuthByName(String name){
         try{
             PreparedStatement ps = connection.prepareStatement(
-                "SELECT user_password FROM users WHERE user_name = ?");
+                "SELECT user_name, user_password, user_role FROM users WHERE user_name = ?");
             ps.setString(1, name);
             ResultSet rs = ps.executeQuery();
 
@@ -229,9 +240,7 @@ public class DatabaseConnector {
             String userName = rs.getString("user_name");
             String password = rs.getString("user_password");
             String role = rs.getString("user_role");
-            List<String> returnList = new ArrayList<>(List.of(userName, password, role));
-            return returnList;
-
+            return new ArrayList<>(List.of(userName, password, role));
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
@@ -243,8 +252,6 @@ public class DatabaseConnector {
             PreparedStatement ps = connection.prepareStatement("SELECT * FROM rooms");
             ResultSet rs = ps.executeQuery();
 
-            if(!rs.next()){return null;}
-
             List<Room> roomList = new ArrayList<>();
             while(rs.next()){
                 int roomId = rs.getInt("room_id");
@@ -252,13 +259,12 @@ public class DatabaseConnector {
                 int capacity = rs.getInt("capacity");
                 AccessLevel access = AccessLevel.valueOf(rs.getString("access_level"));
                 RoomStatus status = RoomStatus.valueOf(rs.getString("room_status"));
-                
+
                 Room returnRoom = new Room(roomId, roomName, capacity, access);
                 returnRoom.setStatus(status);
 
                 roomList.add(returnRoom);
             }
-
             return roomList;
         }
         catch(SQLException e){

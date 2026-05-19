@@ -25,9 +25,13 @@ public class Admin extends User {
     }
 
     public String getAdminId() { return adminId; }
-    
+
     public void setDatabaseConnector(DatabaseConnector connector) {
         this.databaseConnector = connector;
+    }
+
+    public void setBookingRepository(BookingRepository repository) {
+        this.bookingRepository = repository;
     }
 
     @Override
