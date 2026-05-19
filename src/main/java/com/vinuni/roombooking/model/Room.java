@@ -39,6 +39,10 @@ public class Room {
         return status;
     }
 
+    public void setStatus(RoomStatus status){
+        this.status = status;
+    }
+
     /**
      * STUB — Phase 2: check status == AVAILABLE (and optionally query DB for live occupancy).
      */
