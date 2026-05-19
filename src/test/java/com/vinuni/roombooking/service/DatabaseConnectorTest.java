@@ -179,5 +179,34 @@ public class DatabaseConnectorTest {
     //     }
     // }
     
+    /**
+     * Testing findAllRooms() from DatabaseConnector.java
+     * Result: Successful
+     */
+    @Test
+    public void testFindAllRooms(){
+        try{
+            ResultSet rs = databaseConnector.findAllRooms();
+            while(rs.next()){
+                System.out.println("---------------------------------------------------------------");
+                System.out.println("This is room " + rs.getInt("room_id"));
+                System.out.println("Room " + rs.getInt("room_id") + " can store " + rs.getInt("capacity") + " people");
+                System.out.println("This room is currently " + rs.getString("room_status"));
+                if(rs.getString("access_level").equals("STUDENT_ONLY")){
+                    System.out.println("Only student can book this room");
+                }
+                else if(rs.getString("access_level").equals("STAFF_ONLY")){
+                    System.out.println("Only staff can book this room");
+                }
+                else if(rs.getString("access_level").equals("ALL_USERS")){
+                    System.out.println("Both student and staff can book this room");
+                }
+                System.out.println("--------------------------------------------------------------");
+            }
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
     
 }
