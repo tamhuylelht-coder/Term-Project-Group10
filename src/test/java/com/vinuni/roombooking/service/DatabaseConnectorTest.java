@@ -101,6 +101,22 @@ public class DatabaseConnectorTest {
     //     System.out.println(result2);
     //     System.out.println(result3);
     // }
+
+    /**
+     * Testing method insertUser() in DatabaseConnector.java
+     * Result: Insert user in database successfully
+     */
+    // @Test
+    // public void testInsertUser(){
+    //     databaseConnector.insertUser(testStudent);
+    //     databaseConnector.insertUser(testStaff);
+    //     databaseConnector.insertUser(testAdmin);
+
+    //     System.out.println("Users inserted successfully");
+    // }
+
+    
+
     
     
 }
