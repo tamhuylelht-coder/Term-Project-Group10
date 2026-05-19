@@ -1,5 +1,6 @@
 package com.vinuni.roombooking.config;
 
+import com.vinuni.roombooking.service.DatabaseConnector;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -9,10 +10,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.List;
 
 /**
  * Spring Security configuration.
@@ -68,23 +71,27 @@ public class SecurityConfig {
     }
 
     /**
-     * In-memory user store mirroring the three demo accounts in {@code ui.DemoData}.
-     * Roles match {@link com.vinuni.roombooking.model.User#getUserType()}.
+     * DB-backed UserDetailsService. Calls {@link DatabaseConnector#findUserAuthByName(String)},
+     * which returns a 3-element List of [user_name, user_password, user_role] (or null if missing).
+     *
+     * <p>The password column in the DB <em>must</em> contain a BCrypt hash (see Phase-2 brief);
+     * AuthenticationManager will run BCrypt.matches against it. Plaintext passwords in the
+     * users table will fail authentication for every user.</p>
      */
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
-        UserDetails alice = User.withUsername("alice")
-                .password(encoder.encode("pass"))
-                .roles("STUDENT")
-                .build();
-        UserDetails bob = User.withUsername("bob")
-                .password(encoder.encode("pass"))
-                .roles("STAFF")
-                .build();
-        UserDetails carol = User.withUsername("carol")
-                .password(encoder.encode("pass"))
-                .roles("ADMIN")
-                .build();
-        return new InMemoryUserDetailsManager(alice, bob, carol);
+    public UserDetailsService userDetailsService(DatabaseConnector db) {
+        return username -> {
+            List<String> auth = db.findUserAuthByName(username);
+            if (auth == null || auth.size() < 3) {
+                throw new UsernameNotFoundException("No user: " + username);
+            }
+            String storedUsername = auth.get(0);
+            String passwordHash   = auth.get(1);
+            String role           = auth.get(2); // STUDENT / STAFF / ADMIN
+            return User.withUsername(storedUsername)
+                    .password(passwordHash)
+                    .roles(role)
+                    .build();
+        };
     }
 }

@@ -20,25 +20,27 @@ import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.repository.BookingRepository;
-import com.vinuni.roombooking.ui.DemoData;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Queue;
 
 /**
  * View 5 - Admin panel. Restricted to Admin users.
- *   - Room status toggle  -> mutates Room.status (admin.addRoom/removeRoom hooks left for backend)
+ *   - Room status toggle  -> DatabaseConnector.updateRoomStatus(roomId, status)
  *   - Force cancel         -> Admin.forceCancel(bookingId)
- *   - Override pending     -> Admin.overrideRequest(req) + BookingRepository.getPendingQueue()
+ *   - Override pending     -> Admin.overrideRequest(req, approved) + BookingRepository.getPendingQueue()
  */
 @Route(value = "admin", layout = MainLayout.class)
 @PageTitle("Admin")
 public class AdminView extends VerticalLayout implements BeforeEnterObserver {
 
-    private final DemoData demoData;
+    private final DatabaseConnector db;
     private final BookingRepository repository;
     private final VaadinFrontendUI frontend;
 
@@ -46,10 +48,10 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private final Grid<BookingRequest> pendingGrid = new Grid<>(BookingRequest.class, false);
     private final TextField cancelIdField = new TextField("Booking ID");
 
-    public AdminView(DemoData demoData,
+    public AdminView(DatabaseConnector db,
                      BookingRepository repository,
                      VaadinFrontendUI frontend) {
-        this.demoData = demoData;
+        this.db = db;
         this.repository = repository;
         this.frontend = frontend;
         setSizeFull();
@@ -123,9 +125,16 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
         picker.addValueChangeListener(e -> {
             RoomStatus next = e.getValue();
             if (next == null || next == r.status) return;
-            r.status = next;
-            frontend.showConfirmation("Room " + r.getRoomId() + " -> " + next.name());
-            roomGrid.getDataProvider().refreshItem(r);
+            try {
+                // Persist to DB then update the in-memory Room.
+                db.updateRoomStatus(r.getRoomId(), next);
+                r.setStatus(next);
+                frontend.showConfirmation("Room " + r.getRoomId() + " -> " + next.name());
+                roomGrid.getDataProvider().refreshItem(r);
+            } catch (IllegalStateException ex) {
+                frontend.showError(ex.getMessage());
+                picker.setValue(r.status); // revert the picker
+            }
         });
         return picker;
     }
@@ -157,7 +166,8 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void refresh() {
-        roomGrid.setItems(demoData.getRooms());
+        List<Room> rooms = db.findAllRooms();
+        roomGrid.setItems(rooms == null ? Collections.emptyList() : rooms);
         Queue<BookingRequest> q = repository.getPendingQueue();
         pendingGrid.setItems(q == null ? new ArrayList<>() : new ArrayList<>(q));
     }
@@ -175,7 +185,6 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
             frontend.showConfirmation("Force-cancelled " + id);
             cancelIdField.clear();
         } catch (IllegalStateException | IllegalArgumentException ex) {
-            // Most common cause today: Admin.bookingRepository not wired yet (backend TODO).
             frontend.showError(ex.getMessage());
         }
         refresh();
