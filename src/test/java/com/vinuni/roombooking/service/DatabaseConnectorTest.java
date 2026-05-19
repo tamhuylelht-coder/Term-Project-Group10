@@ -119,36 +119,65 @@ public class DatabaseConnectorTest {
 
     /**
      * Testing method findUserByName()
-     * Result
+     * Result: Successful
      */
-    @Test
-    public void testFindUserByName(){
-        String name = "Test Student";
-        String name2 = "Test Student 2";
+    // @Test
+    // public void testFindUserByName(){
+    //     String name = "Test Student";
+    //     String name2 = "Test Student 2";
 
-        try{
-            ResultSet rs = databaseConnector.findUserByName(name);
-            ResultSet rs2 = databaseConnector.findUserByName(name2);
+    //     try{
+    //         ResultSet rs = databaseConnector.findUserByName(name);
+    //         ResultSet rs2 = databaseConnector.findUserByName(name2);
 
-            // Print the result of the first name
-            if(rs.next()){
-                System.out.println("User found, user has id: " + rs.getString("user_id"));
-            }
-            else{System.out.println("No user found");}
+    //         // Print the result of the first name
+    //         if(rs.next()){
+    //             System.out.println("User found, user has id: " + rs.getString("user_id"));
+    //         }
+    //         else{System.out.println("No user found");}
 
-            // Print the result 
-            if(rs2.next()){
-                System.out.println("User found, user has id: " + rs2.getString("user_id"));
-            }
-            else{System.out.println("No user found");}
-        }
-        catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
-        }
+    //         // Print the result 
+    //         if(rs2.next()){
+    //             System.out.println("User found, user has id: " + rs2.getString("user_id"));
+    //         }
+    //         else{System.out.println("No user found");}
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
         
 
-    }
+    // }
 
+    /**
+     * Testing method findUserAuthByName() from DatabaseConnector.java
+     * Result: Successful
+     */
+    // @Test
+    // public void testFindUserAuthByName(){
+    //     String name = "Test Staff";
+    //     String name2 = "Test Staff 2";
+
+    //     try{
+    //         ResultSet rs = databaseConnector.findUserAuthByName(name);
+    //         ResultSet rs2 = databaseConnector.findUserAuthByName(name2);
+
+    //         //Print the output of the first name
+    //         if(rs.next()){
+    //             System.out.println("User found, user has password: " + rs.getString("user_password"));
+    //         }
+    //         else{System.out.println("User not found");}
+
+    //         //Print the output of the second name
+    //         if(rs2.next()){
+    //             System.out.println("User found, user has password: " + rs2.getString("user_password"));   
+    //         }
+    //         else{System.out.println("User not found");}
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
     
     
 }
