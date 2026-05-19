@@ -217,12 +217,21 @@ public class DatabaseConnector {
         }
     }
 
-    public ResultSet findUserAuthByName(String name){
+    public List<String> findUserAuthByName(String name){
         try{
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT user_password FROM users WHERE user_name = ?");
             ps.setString(1, name);
-            return ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
+
+            if(!rs.next()){return null;}
+
+            String userName = rs.getString("user_name");
+            String password = rs.getString("user_password");
+            String role = rs.getString("user_role");
+            List<String> returnList = new ArrayList<>(List.of(userName, password, role));
+            return returnList;
+
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
@@ -233,6 +242,9 @@ public class DatabaseConnector {
         try{
             PreparedStatement ps = connection.prepareStatement("SELECT * FROM rooms");
             ResultSet rs = ps.executeQuery();
+
+            if(!rs.next()){return null;}
+
             List<Room> roomList = new ArrayList<>();
             while(rs.next()){
                 int roomId = rs.getInt("room_id");
