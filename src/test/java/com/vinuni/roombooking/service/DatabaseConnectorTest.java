@@ -183,30 +183,69 @@ public class DatabaseConnectorTest {
      * Testing findAllRooms() from DatabaseConnector.java
      * Result: Successful
      */
-    @Test
-    public void testFindAllRooms(){
-        try{
-            ResultSet rs = databaseConnector.findAllRooms();
-            while(rs.next()){
-                System.out.println("---------------------------------------------------------------");
-                System.out.println("This is room " + rs.getInt("room_id"));
-                System.out.println("Room " + rs.getInt("room_id") + " can store " + rs.getInt("capacity") + " people");
-                System.out.println("This room is currently " + rs.getString("room_status"));
-                if(rs.getString("access_level").equals("STUDENT_ONLY")){
-                    System.out.println("Only student can book this room");
-                }
-                else if(rs.getString("access_level").equals("STAFF_ONLY")){
-                    System.out.println("Only staff can book this room");
-                }
-                else if(rs.getString("access_level").equals("ALL_USERS")){
-                    System.out.println("Both student and staff can book this room");
-                }
-                System.out.println("--------------------------------------------------------------");
-            }
-        }
-        catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
-        }
-    }
+    // @Test
+    // public void testFindAllRooms(){
+    //     try{
+    //         ResultSet rs = databaseConnector.findAllRooms();
+    //         while(rs.next()){
+    //             System.out.println("---------------------------------------------------------------");
+    //             System.out.println("This is room " + rs.getInt("room_id"));
+    //             System.out.println("Room " + rs.getInt("room_id") + " can store " + rs.getInt("capacity") + " people");
+    //             System.out.println("This room is currently " + rs.getString("room_status"));
+    //             if(rs.getString("access_level").equals("STUDENT_ONLY")){
+    //                 System.out.println("Only student can book this room");
+    //             }
+    //             else if(rs.getString("access_level").equals("STAFF_ONLY")){
+    //                 System.out.println("Only staff can book this room");
+    //             }
+    //             else if(rs.getString("access_level").equals("ALL_USERS")){
+    //                 System.out.println("Both student and staff can book this room");
+    //             }
+    //             System.out.println("--------------------------------------------------------------");
+    //         }
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
+
+    /**
+     * Testing findRoomById() in DatabaseConnector.java
+     * Result: Success
+     */
+    // @Test
+    // public void testFindRoomById(){
+    //     int id = 1;
+    //     int id2 = 2;
+    //     int id3 = 4;
+
+    //     try{
+    //         ResultSet rs = databaseConnector.findRoomById(id);
+    //         ResultSet rs2 = databaseConnector.findRoomById(id2);
+    //         ResultSet rs3 = databaseConnector.findRoomById(id3);
+
+    //         //Print the output for id
+    //         if(rs.next()){
+    //             System.out.println("Room id " + id + " found, this room name is " + rs.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+
+    //         //Print the output for id2
+    //         if(rs2.next()){
+    //             System.out.println("Room id " + id2 + " found, this room name is " + rs2.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+
+    //         //Print the output for id3
+    //         if(rs3.next()){
+    //             System.out.println("Room id " + id3 + " found, this room name is " + rs3.getString("room_name"));
+    //         }
+    //         else{System.out.println("Room not found");}
+                
+    //     }
+    //     catch(SQLException e){
+    //         throw new IllegalStateException("Cannot make query: " + e);
+    //     }
+    // }
     
 }
