@@ -6,8 +6,10 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Admin;
+import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.enums.AccessLevel;
+import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.repository.BookingRepository;
 
 import jakarta.annotation.PostConstruct;
@@ -17,8 +19,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.sql.*;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
+import java.time.LocalDateTime;
 
 
 /**
@@ -228,6 +232,51 @@ public class DatabaseConnector {
         }
     }
 
+
+    public User findUserById(String userId){
+        try{
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM users WHERE user_id = ?");
+            ps.setString(1,userId);
+            ResultSet rs =  ps.executeQuery();
+
+            if(!rs.next()){
+                return null;
+            }
+
+            String userName = rs.getString("user_name");
+            String password = rs.getString("user_password");
+            String email = rs.getString("user_email");
+            String role = rs.getString("user_role");
+            if(role.equals("STUDENT")){
+                String studentId = rs.getString("student_id");
+                String major = rs.getString("student_major");
+                int yearOfStudy = rs.getInt("year_of_study");
+
+                return new Student(userId, userName, password, email, studentId, major, yearOfStudy);
+            }
+            else if(role.equals("STAFF")){
+                String staffId = rs.getString("staff_id");
+                String department=  rs.getString("staff_department");
+
+                return new Staff(userId, userName, password, email, staffId, department);
+            }
+            else if(role.equals("ADMIN")){
+                String adminId = rs.getString("admin_id");
+                Admin admin = new Admin(userId, userName, password, email, adminId);
+                // Wire deps so AdminView's forceCancel / overrideRequest work.
+                admin.setDatabaseConnector(this);
+                admin.setBookingRepository(bookingRepository);
+                return admin;
+            }
+            else{return null;}
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: "+ e);
+        }
+    }
+
+
     public List<String> findUserAuthByName(String name){
         try{
             PreparedStatement ps = connection.prepareStatement(
@@ -359,6 +408,96 @@ public class DatabaseConnector {
             throw new IllegalStateException("Cannot make query: " + e);
         }
     }
+
+    /**
+     * Methods for managing RSVP
+     */
+    public void insertRsvp(){
+
+    }
+
+    /**
+     * Fetch RsvpList(bookingId) method: return HashSet
+     * of user name in the rsvp list
+     * @param bookingId
+     * @return
+     */
+    public HashSet<String> fetchRsvpList(String bookingId){
+        try{
+            PreparedStatement ps = connection.prepareStatement("SELECT user_id FROM rsvp WHERE booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            HashSet<String> rsvpList = new HashSet<>();
+
+            while(rs.next()){
+                String userId = rs.getString("user_id");
+                rsvpList.add(userId);
+            }
+
+            return rsvpList;
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+
+    }
+
+
+    public BookingRequest findBookingById(String bookingId){
+        try{
+            PreparedStatement ps = connection.prepareStatement("SELECT * FROM bookings where booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+
+            if(!rs.next()){return null;} // No booking found
+
+            String userId = rs.getString("user_id");
+            int roomId = rs.getInt("room_id");
+            LocalDateTime startTime = rs.getTimestamp("start_time").toLocalDateTime();
+            LocalDateTime endTime = rs.getTimestamp("end_time").toLocalDateTime();
+            TimeSlot timeSlot = new TimeSlot(startTime, endTime);
+            BookingStatus bookingStatus = BookingStatus.valueOf(rs.getString("booking_status"));
+            LocalDateTime createdAt = rs.getTimestamp("created_at").toLocalDateTime();
+
+            User hostUser = findUserById(userId);
+            Room roomBooked = findRoomById(roomId);
+            HashSet<String> rsvplist = fetchRsvpList(bookingId);
+
+            BookingRequest req = new BookingRequest(bookingId, hostUser, roomBooked, timeSlot, rsvplist, bookingStatus, createdAt);
+            return req;
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
+
+    public List<BookingRequest> fetchBookingsByUser(User user){
+        String userId =  user.getUserId();
+
+        try{
+            PreparedStatement ps = connection.prepareStatement("SELECT booking_id FROM bookings WHERE user_id = ?");
+            ps.setString(1, userId);
+
+            ResultSet rs = ps.executeQuery();
+
+            List<BookingRequest> bookingList = new ArrayList<>();
+
+            while(rs.next()){
+                String bookingId = rs.getString("booking_id");
+                BookingRequest req = findBookingById(bookingId);
+                bookingList.add(req);
+            }
+            return bookingList;
+        }
+        catch (SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+        
+    }
+    
+    
+
 
     /**
      * STUB — Phase 2 (Huy Tam): close connection gracefully.
