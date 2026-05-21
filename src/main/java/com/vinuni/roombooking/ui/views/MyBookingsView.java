@@ -15,6 +15,7 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.service.BookingService;
 import com.vinuni.roombooking.service.DatabaseConnector;
+import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
@@ -63,7 +64,8 @@ public class MyBookingsView extends VerticalLayout {
                 .setHeader("Start").setAutoWidth(true);
         grid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
                 .setHeader("End").setAutoWidth(true);
-        grid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
+        grid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
+                .setHeader("Status").setAutoWidth(true);
         grid.addColumn(r -> db.countRsvps(r.getBookingId())).setHeader("RSVPs").setAutoWidth(true);
         grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();

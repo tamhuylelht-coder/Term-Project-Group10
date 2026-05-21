@@ -75,26 +75,35 @@ public class DatabaseConnector {
      * Returns null until implemented.
      */
 
-    public void insertRoom(Room room){
-        int roomId = room.getRoomId();
+    /**
+     * Persist a new Room. The {@code room.getRoomId()} value is ignored —
+     * the rooms table uses {@code AUTO_INCREMENT}, so the DB picks the next id.
+     * Callers that need the generated id should re-query via {@link #findAllRooms()}
+     * or pull it from the returned value.
+     *
+     * @return the DB-assigned room_id, or -1 if the driver didn't return one.
+     */
+    public int insertRoom(Room room){
         String roomName = room.getRoomName();
         int capacity = room.getCapacity();
         String access = room.getAccess().name();
         String status = room.getStatus().name();
 
         try{
-            PreparedStatement ps = connection.prepareStatement("INSERT INTO rooms (room_id, room_name, capacity, access_level, room_status) VALUES (?, ?, ?, ?,?)");
-            ps.setInt(1, roomId);
-            ps.setString(2, roomName);
-            ps.setInt(3, capacity);
-            ps.setString(4, access);
-            ps.setString(5, status);
+            PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO rooms (room_name, capacity, access_level, room_status) VALUES (?, ?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, roomName);
+            ps.setInt(2, capacity);
+            ps.setString(3, access);
+            ps.setString(4, status);
             ps.executeUpdate();
+            ResultSet keys = ps.getGeneratedKeys();
+            return keys.next() ? keys.getInt(1) : -1;
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
         }
-        
     }
 
     public ResultSet fetchRoomSchedules(int roomId) {
@@ -490,6 +499,25 @@ public class DatabaseConnector {
             return rs.next() ? rs.getInt("c") : 0;
         } catch (SQLException e) {
             throw new IllegalStateException("Cannot count RSVPs: " + e);
+        }
+    }
+
+    /**
+     * Returns true if (bookingId, userId) already exists in the rsvp table.
+     * The in-memory BookingRequest.rsvpList resets on restart, so service.addRsvp
+     * succeeds on day 2 even if the DB already has the row. This guard lets the
+     * frontend show a friendly "already RSVPed" message instead of producing a
+     * duplicate DB row.
+     */
+    public boolean hasRsvp(String bookingId, String userId) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM rsvp WHERE booking_id = ? AND user_id = ?");
+            ps.setString(1, bookingId);
+            ps.setString(2, userId);
+            return ps.executeQuery().next();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot check RSVP: " + e);
         }
     }
 

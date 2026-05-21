@@ -26,6 +26,7 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.service.BookingService;
 import com.vinuni.roombooking.service.DatabaseConnector;
+import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
@@ -136,11 +137,14 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
         roomGrid.addColumn(Room::getRoomName).setHeader("Name").setAutoWidth(true);
         roomGrid.addColumn(Room::getCapacity).setHeader("Capacity").setAutoWidth(true);
         roomGrid.addColumn(r -> r.getAccess().name()).setHeader("Access").setAutoWidth(true);
-        roomGrid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
+        roomGrid.addComponentColumn(r -> Badges.roomStatus(r.getStatus()))
+                .setHeader("Status").setAutoWidth(true);
         roomGrid.addComponentColumn(this::buildStatusPicker)
                 .setHeader("Change to").setAutoWidth(true);
         roomGrid.addComponentColumn(this::buildRemoveButton)
                 .setHeader("Remove").setAutoWidth(true);
+        // Grow with content instead of being trapped in the parent's scroll area.
+        roomGrid.setAllRowsVisible(true);
         roomGrid.getStyle()
                 .set("font-size", "1.05rem")
                 .set("--vaadin-grid-cell-padding", "1rem");
@@ -216,16 +220,13 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
             frontend.showError("Capacity must be a positive number"); return;
         }
         if (acc == null) { frontend.showError("Pick an access level"); return; }
-        // Find the next id by scanning current rooms (simple, demo-safe).
-        List<Room> all = db.findAllRooms();
-        int nextId = 1;
-        if (all != null) {
-            for (Room r : all) if (r.getRoomId() >= nextId) nextId = r.getRoomId() + 1;
-        }
-        Room room = new Room(nextId, name.trim(), cap, acc);
+        // Schema uses AUTO_INCREMENT; the roomId in the Room ctor is a placeholder
+        // and gets ignored by insertRoom. DB returns the real id.
+        Room room = new Room(0, name.trim(), cap, acc);
         try {
-            db.insertRoom(room);
-            frontend.showConfirmation("Added " + room.getRoomName() + " (id " + room.getRoomId() + ")");
+            int newId = db.insertRoom(room);
+            String idLabel = newId > 0 ? " (id " + newId + ")" : "";
+            frontend.showConfirmation("Added " + room.getRoomName() + idLabel);
             newRoomName.clear();
             refresh();
         } catch (IllegalStateException ex) {
@@ -249,9 +250,11 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
         pendingGrid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
         pendingGrid.addColumn(r -> r.getTimeSlot().getStartTime().toString())
                 .setHeader("Start").setAutoWidth(true);
-        pendingGrid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
+        pendingGrid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
+                .setHeader("Status").setAutoWidth(true);
         pendingGrid.addComponentColumn(this::buildOverrideButtons)
                 .setHeader("Override").setAutoWidth(true);
+        pendingGrid.setAllRowsVisible(true);
         pendingGrid.getStyle()
                 .set("font-size", "1.05rem")
                 .set("--vaadin-grid-cell-padding", "1rem");
@@ -262,6 +265,7 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
         userGrid.addColumn(User::getUserName).setHeader("Name").setAutoWidth(true);
         userGrid.addColumn(User::getEmail).setHeader("Email").setAutoWidth(true);
         userGrid.addColumn(User::getUserType).setHeader("Role").setAutoWidth(true);
+        userGrid.setAllRowsVisible(true);
         userGrid.getStyle()
                 .set("font-size", "1.05rem")
                 .set("--vaadin-grid-cell-padding", "1rem");

@@ -112,6 +112,13 @@ public class BrowseBookingsView extends VerticalLayout {
         User user = SessionUtil.getCurrentUser();
         if (user == null) { frontend.showError("Not logged in"); return; }
         try {
+            // Guard against duplicates that the in-memory rsvpList misses after
+            // a restart (it always starts empty, so service.addRsvp would let a
+            // re-RSVP through even though the DB already has the row).
+            if (db.hasRsvp(req.getBookingId(), user.getUserId())) {
+                frontend.showError("You've already RSVPed to " + req.getBookingId());
+                return;
+            }
             boolean added = service.addRsvp(req.getBookingId(), user);
             if (!added) {
                 frontend.showError("You've already RSVPed to " + req.getBookingId());
@@ -120,7 +127,9 @@ public class BrowseBookingsView extends VerticalLayout {
             db.insertRsvp(req.getBookingId(), user.getUserId());
             frontend.showConfirmation("RSVPed to " + req.getBookingId());
         } catch (IllegalStateException ex) {
-            // Likely a duplicate RSVP row in DB — still treat as user-visible info.
+            // Defensive fallback: if a race let two writers through, the second
+            // insert may still fail (no unique constraint today, but possible
+            // future migration). Surface it as a normal user-facing error.
             frontend.showError("RSVP not recorded: " + ex.getMessage());
         }
         refresh();
