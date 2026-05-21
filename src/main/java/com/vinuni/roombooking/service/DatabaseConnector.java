@@ -2,10 +2,12 @@ package com.vinuni.roombooking.service;
 
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Room;
+import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Admin;
+import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.repository.BookingRepository;
@@ -357,6 +359,137 @@ public class DatabaseConnector {
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
+    public List<BookingRequest> findBookingsByUser(String userId) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       u.user_id, u.user_name, u.user_password, u.user_email, u.user_role, " +
+                "       u.student_id, u.student_major, u.year_of_study, " +
+                "       u.staff_id, u.staff_department, u.admin_id, " +
+                "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status " +
+                "FROM bookings b " +
+                "JOIN users u ON b.user_id = u.user_id " +
+                "JOIN rooms r ON b.room_id = r.room_id " +
+                "WHERE b.user_id = ?");
+            ps.setString(1, userId);
+            ResultSet rs = ps.executeQuery();
+            List<BookingRequest> out = new ArrayList<>();
+            while (rs.next()) out.add(bookingFromRow(rs));
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch bookings by user: " + e);
+        }
+    }
+
+    public List<BookingRequest> findAllBookings() {
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       u.user_id, u.user_name, u.user_password, u.user_email, u.user_role, " +
+                "       u.student_id, u.student_major, u.year_of_study, " +
+                "       u.staff_id, u.staff_department, u.admin_id, " +
+                "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status " +
+                "FROM bookings b " +
+                "JOIN users u ON b.user_id = u.user_id " +
+                "JOIN rooms r ON b.room_id = r.room_id");
+            ResultSet rs = ps.executeQuery();
+            List<BookingRequest> out = new ArrayList<>();
+            while (rs.next()) out.add(bookingFromRow(rs));
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch all bookings: " + e);
+        }
+    }
+
+    private BookingRequest bookingFromRow(ResultSet rs) throws SQLException {
+        User user = userFromRow(rs);
+        Room room = new Room(
+                rs.getInt("room_id"),
+                rs.getString("room_name"),
+                rs.getInt("capacity"),
+                AccessLevel.valueOf(rs.getString("access_level")));
+        room.setStatus(RoomStatus.valueOf(rs.getString("room_status")));
+        TimeSlot slot = new TimeSlot(
+                rs.getTimestamp("start_time").toLocalDateTime(),
+                rs.getTimestamp("end_time").toLocalDateTime());
+        BookingRequest req = new BookingRequest(rs.getString("booking_id"), user, room, slot);
+        req.setStatus(BookingStatus.valueOf(rs.getString("booking_status")));
+        return req;
+    }
+
+    private User userFromRow(ResultSet rs) throws SQLException {
+        String role = rs.getString("user_role");
+        String userId = rs.getString("user_id");
+        String userName = rs.getString("user_name");
+        String password = rs.getString("user_password");
+        String email = rs.getString("user_email");
+        if ("STUDENT".equals(role)) {
+            return new Student(userId, userName, password, email,
+                    rs.getString("student_id"),
+                    rs.getString("student_major"),
+                    rs.getInt("year_of_study"));
+        } else if ("STAFF".equals(role)) {
+            return new Staff(userId, userName, password, email,
+                    rs.getString("staff_id"),
+                    rs.getString("staff_department"));
+        } else if ("ADMIN".equals(role)) {
+            Admin admin = new Admin(userId, userName, password, email, rs.getString("admin_id"));
+            admin.setDatabaseConnector(this);
+            admin.setBookingRepository(bookingRepository);
+            return admin;
+        }
+        return null;
+    }
+
+    public List<User> findAllUsers() {
+        try {
+            PreparedStatement ps = connection.prepareStatement("SELECT * FROM users");
+            ResultSet rs = ps.executeQuery();
+            List<User> out = new ArrayList<>();
+            while (rs.next()) {
+                User u = userFromRow(rs);
+                if (u != null) out.add(u);
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch users: " + e);
+        }
+    }
+
+    public void deleteRoom(int roomId) {
+        try {
+            PreparedStatement ps = connection.prepareStatement("DELETE FROM rooms WHERE room_id = ?");
+            ps.setInt(1, roomId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot delete room: " + e);
+        }
+    }
+
+    public void insertRsvp(String bookingId, String userId) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO rsvp (booking_id, user_id) VALUES (?, ?)");
+            ps.setString(1, bookingId);
+            ps.setString(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot insert RSVP: " + e);
+        }
+    }
+
+    public int countRsvps(String bookingId) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT COUNT(*) AS c FROM rsvp WHERE booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getInt("c") : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot count RSVPs: " + e);
         }
     }
 

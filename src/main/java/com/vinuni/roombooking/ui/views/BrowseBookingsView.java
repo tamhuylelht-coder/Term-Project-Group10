@@ -2,7 +2,6 @@ package com.vinuni.roombooking.ui.views;
 
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
@@ -23,12 +22,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * View 4 - My bookings. Reads from BookingRepository.findByUser() and offers
- * per-row Cancel via BookingService.cancelBooking().
+ * View 6 - Browse approved bookings hosted by other users and RSVP to attend.
+ * Calls BookingService.addRsvp() and DatabaseConnector.insertRsvp() so RSVP
+ * counts survive a restart.
  */
-@Route(value = "my-bookings", layout = MainLayout.class)
-@PageTitle("My Bookings")
-public class MyBookingsView extends VerticalLayout {
+@Route(value = "browse", layout = MainLayout.class)
+@PageTitle("Browse bookings")
+public class BrowseBookingsView extends VerticalLayout {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -38,12 +38,12 @@ public class MyBookingsView extends VerticalLayout {
     private final VaadinFrontendUI frontend;
     private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
     private final Paragraph emptyState = new Paragraph(
-            "No bookings yet. Open the Rooms page to book one.");
+            "Nothing to RSVP to yet. Approved bookings from other users will show up here.");
 
-    public MyBookingsView(BookingRepository repository,
-                          BookingService service,
-                          DatabaseConnector db,
-                          VaadinFrontendUI frontend) {
+    public BrowseBookingsView(BookingRepository repository,
+                              BookingService service,
+                              DatabaseConnector db,
+                              VaadinFrontendUI frontend) {
         this.repository = repository;
         this.service = service;
         this.db = db;
@@ -51,21 +51,26 @@ public class MyBookingsView extends VerticalLayout {
         setSizeFull();
         getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
 
-        H2 heading = new H2("My bookings");
+        H2 heading = new H2("Browse bookings");
         heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
         add(heading);
+
+        Paragraph hint = new Paragraph(
+                "RSVP to approved bookings from other users to mark yourself as attending.");
+        hint.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        add(hint);
 
         emptyState.getStyle().set("font-size", "1.1rem");
 
         grid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
+        grid.addColumn(r -> r.getUser().getUserName()).setHeader("Host").setAutoWidth(true);
         grid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
         grid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
                 .setHeader("Start").setAutoWidth(true);
         grid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
                 .setHeader("End").setAutoWidth(true);
-        grid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
         grid.addColumn(r -> db.countRsvps(r.getBookingId())).setHeader("RSVPs").setAutoWidth(true);
-        grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
+        grid.addComponentColumn(this::buildRsvpButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
         grid.getStyle()
                 .set("font-size", "1.05rem")
@@ -75,14 +80,11 @@ public class MyBookingsView extends VerticalLayout {
         refresh();
     }
 
-    private Button buildCancelButton(BookingRequest req) {
-        Button cancel = new Button("Cancel", e -> confirmCancel(req));
-        cancel.addThemeVariants(ButtonVariant.LUMO_ERROR);
-        cancel.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
-        boolean already = req.getStatus() == BookingStatus.CANCELLED
-                       || req.getStatus() == BookingStatus.REJECTED;
-        cancel.setEnabled(!already);
-        return cancel;
+    private Button buildRsvpButton(BookingRequest req) {
+        Button b = new Button("RSVP", e -> rsvp(req));
+        b.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        b.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
+        return b;
     }
 
     private void refresh() {
@@ -93,34 +95,33 @@ public class MyBookingsView extends VerticalLayout {
             grid.setVisible(false);
             return;
         }
-        // Hydrate the in-memory repo from DB so cancel/RSVP can find bookings
-        // that were persisted in a previous app run or by another session.
-        List<BookingRequest> fromDb = db.findBookingsByUser(user.getUserId());
-        for (BookingRequest req : fromDb) repository.save(req);
-        List<BookingRequest> mine = repository.findByUser(user.getUserId());
-        grid.setItems(mine);
-        emptyState.setVisible(mine.isEmpty());
-        grid.setVisible(!mine.isEmpty());
+        // Hydrate from DB so addRsvp can find the booking in the in-memory repo.
+        List<BookingRequest> all = db.findAllBookings();
+        for (BookingRequest req : all) repository.save(req);
+
+        List<BookingRequest> browsable = all.stream()
+                .filter(r -> r.getStatus() == BookingStatus.APPROVED)
+                .filter(r -> !r.getUser().getUserId().equals(user.getUserId()))
+                .toList();
+        grid.setItems(browsable);
+        emptyState.setVisible(browsable.isEmpty());
+        grid.setVisible(!browsable.isEmpty());
     }
 
-    private void confirmCancel(BookingRequest req) {
-        ConfirmDialog dlg = new ConfirmDialog(
-                "Cancel booking?",
-                "Cancel booking " + req.getBookingId() + " for "
-                        + req.getRoom().getRoomName() + "? This cannot be undone.",
-                "Cancel booking", e -> cancel(req),
-                "Keep it", e -> {});
-        dlg.setConfirmButtonTheme("error primary");
-        dlg.open();
-    }
-
-    private void cancel(BookingRequest req) {
+    private void rsvp(BookingRequest req) {
         User user = SessionUtil.getCurrentUser();
-        boolean ok = service.cancelBooking(req.getBookingId(), user);
-        if (ok) {
-            frontend.showConfirmation("Cancelled " + req.getBookingId());
-        } else {
-            frontend.showError("Could not cancel " + req.getBookingId());
+        if (user == null) { frontend.showError("Not logged in"); return; }
+        try {
+            boolean added = service.addRsvp(req.getBookingId(), user);
+            if (!added) {
+                frontend.showError("You've already RSVPed to " + req.getBookingId());
+                return;
+            }
+            db.insertRsvp(req.getBookingId(), user.getUserId());
+            frontend.showConfirmation("RSVPed to " + req.getBookingId());
+        } catch (IllegalStateException ex) {
+            // Likely a duplicate RSVP row in DB — still treat as user-visible info.
+            frontend.showError("RSVP not recorded: " + ex.getMessage());
         }
         refresh();
     }

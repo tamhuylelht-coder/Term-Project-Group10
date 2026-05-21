@@ -66,7 +66,7 @@ public class RoomListView extends VerticalLayout {
         grid.addColumn(Room::getRoomName).setHeader("Name").setAutoWidth(true);
         grid.addColumn(Room::getCapacity).setHeader("Capacity").setAutoWidth(true);
         grid.addColumn(r -> r.getAccess().name()).setHeader("Access").setAutoWidth(true);
-        grid.addComponentColumn(r -> new Span(r.isAvailable() ? "Available" : r.status.name()))
+        grid.addComponentColumn(r -> new Span(r.isAvailable() ? "Available" : r.getStatus().name()))
                 .setHeader("Status").setAutoWidth(true);
         grid.addComponentColumn(this::buildBookButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
@@ -83,7 +83,16 @@ public class RoomListView extends VerticalLayout {
         Button book = new Button("Book", e ->
                 getUI().ifPresent(ui -> ui.navigate(BookingFormView.class, room.getRoomId())));
         book.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
-        book.setEnabled(canBook(room));
+        boolean allowed = canBook(room);
+        boolean available = room.isAvailable();
+        book.setEnabled(allowed && available);
+        if (!allowed) {
+            book.getElement().setAttribute("title",
+                    "Your role can't book a " + room.getAccess().name() + " room.");
+        } else if (!available) {
+            book.getElement().setAttribute("title",
+                    "Room is currently " + room.getStatus().name() + ".");
+        }
         return book;
     }
 

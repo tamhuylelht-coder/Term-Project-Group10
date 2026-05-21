@@ -121,6 +121,10 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
         User user = SessionUtil.getCurrentUser();
         if (user == null) { frontend.showError("Not logged in"); return; }
         if (room == null) { frontend.showError("No room selected"); return; }
+        if (!room.isAvailable()) {
+            frontend.showError("Room is " + room.getStatus().name() + " - cannot be booked.");
+            return;
+        }
 
         LocalDateTime s = startPicker.getValue();
         LocalDateTime e = endPicker.getValue();
