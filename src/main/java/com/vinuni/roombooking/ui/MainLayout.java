@@ -9,10 +9,12 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
+import com.vaadin.flow.router.HighlightConditions;
 import com.vaadin.flow.router.RouterLink;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.ui.views.AdminView;
+import com.vinuni.roombooking.ui.views.BrowseBookingsView;
 import com.vinuni.roombooking.ui.views.LoginView;
 import com.vinuni.roombooking.ui.views.MyBookingsView;
 import com.vinuni.roombooking.ui.views.RoomListView;
@@ -32,7 +34,8 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
 
         HorizontalLayout nav = new HorizontalLayout(
                 styledNav(new RouterLink("Rooms", RoomListView.class)),
-                styledNav(new RouterLink("My Bookings", MyBookingsView.class))
+                styledNav(new RouterLink("My Bookings", MyBookingsView.class)),
+                styledNav(new RouterLink("Browse", BrowseBookingsView.class))
         );
         nav.setSpacing(true);
 
@@ -47,10 +50,32 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         addToNavbar(header);
     }
 
-    /** Slightly larger nav links so the top bar reads easily. */
+    /** Nav link with a visible underline when its route is currently active. */
     private RouterLink styledNav(RouterLink link) {
-        link.getStyle().set("font-size", "1.1rem").set("font-weight", "500");
+        link.getStyle()
+                .set("font-size", "1.1rem")
+                .set("font-weight", "500")
+                .set("padding", "0.25rem 0.5rem")
+                .set("border-radius", "var(--lumo-border-radius-m)");
+        link.setHighlightCondition(HighlightConditions.sameLocation());
+        link.getElement().addPropertyChangeListener("highlighted", "highlighted-changed", ev -> {
+            boolean active = Boolean.TRUE.equals(link.getElement().getProperty("highlighted", false));
+            applyActiveStyle(link, active);
+        });
+        applyActiveStyle(link, false);
         return link;
+    }
+
+    private void applyActiveStyle(RouterLink link, boolean active) {
+        if (active) {
+            link.getStyle()
+                    .set("background", "var(--lumo-primary-color-10pct)")
+                    .set("color", "var(--lumo-primary-text-color)");
+        } else {
+            link.getStyle()
+                    .set("background", "transparent")
+                    .set("color", "var(--lumo-body-text-color)");
+        }
     }
 
     private HorizontalLayout buildUserMenu() {
@@ -64,9 +89,7 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
             greeting.getStyle().set("font-size", "1.05rem");
             menu.add(greeting);
             if (user instanceof Admin) {
-                RouterLink adminLink = new RouterLink("Admin", AdminView.class);
-                adminLink.getStyle().set("font-size", "1.1rem").set("font-weight", "500");
-                menu.add(adminLink);
+                menu.add(styledNav(new RouterLink("Admin", AdminView.class)));
             }
             Button logout = new Button("Logout", e -> {
                 SessionUtil.logout();
