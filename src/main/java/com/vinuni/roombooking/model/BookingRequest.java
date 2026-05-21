@@ -25,6 +25,16 @@ public class BookingRequest {
         this.createdAt = LocalDateTime.now();
     }
 
+    public BookingRequest(String bookingId, User user, Room room, TimeSlot timeSlot, HashSet<String> rsvpList, BookingStatus status, LocalDateTime createdAt){
+        this.bookingId = bookingId;
+        this.user = user;
+        this.room = room;
+        this.timeSlot = timeSlot;
+        this.rsvpList = rsvpList;
+        this.status = status;
+        this.createdAt = createdAt;
+    }
+
     public String        getBookingId() { return bookingId; }
     public User          getUser()      { return user; }
     public Room          getRoom()      { return room; }
