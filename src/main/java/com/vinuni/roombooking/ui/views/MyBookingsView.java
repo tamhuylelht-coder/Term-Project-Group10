@@ -2,6 +2,7 @@ package com.vinuni.roombooking.ui.views;
 
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
@@ -13,6 +14,8 @@ import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.service.DatabaseConnector;
+import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
@@ -32,6 +35,7 @@ public class MyBookingsView extends VerticalLayout {
 
     private final BookingRepository repository;
     private final BookingService service;
+    private final DatabaseConnector db;
     private final VaadinFrontendUI frontend;
     private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
     private final Paragraph emptyState = new Paragraph(
@@ -39,9 +43,11 @@ public class MyBookingsView extends VerticalLayout {
 
     public MyBookingsView(BookingRepository repository,
                           BookingService service,
+                          DatabaseConnector db,
                           VaadinFrontendUI frontend) {
         this.repository = repository;
         this.service = service;
+        this.db = db;
         this.frontend = frontend;
         setSizeFull();
         getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
@@ -58,7 +64,9 @@ public class MyBookingsView extends VerticalLayout {
                 .setHeader("Start").setAutoWidth(true);
         grid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
                 .setHeader("End").setAutoWidth(true);
-        grid.addColumn(r -> r.getStatus().name()).setHeader("Status").setAutoWidth(true);
+        grid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
+                .setHeader("Status").setAutoWidth(true);
+        grid.addColumn(r -> db.countRsvps(r.getBookingId())).setHeader("RSVPs").setAutoWidth(true);
         grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
         grid.getStyle()
@@ -70,7 +78,7 @@ public class MyBookingsView extends VerticalLayout {
     }
 
     private Button buildCancelButton(BookingRequest req) {
-        Button cancel = new Button("Cancel", e -> cancel(req));
+        Button cancel = new Button("Cancel", e -> confirmCancel(req));
         cancel.addThemeVariants(ButtonVariant.LUMO_ERROR);
         cancel.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
         boolean already = req.getStatus() == BookingStatus.CANCELLED
@@ -81,12 +89,31 @@ public class MyBookingsView extends VerticalLayout {
 
     private void refresh() {
         User user = SessionUtil.getCurrentUser();
-        List<BookingRequest> mine = user == null
-                ? List.of()
-                : repository.findByUser(user.getUserId());
+        if (user == null) {
+            grid.setItems(List.of());
+            emptyState.setVisible(true);
+            grid.setVisible(false);
+            return;
+        }
+        // Hydrate the in-memory repo from DB so cancel/RSVP can find bookings
+        // that were persisted in a previous app run or by another session.
+        List<BookingRequest> fromDb = db.findBookingsByUser(user.getUserId());
+        for (BookingRequest req : fromDb) repository.save(req);
+        List<BookingRequest> mine = repository.findByUser(user.getUserId());
         grid.setItems(mine);
         emptyState.setVisible(mine.isEmpty());
         grid.setVisible(!mine.isEmpty());
+    }
+
+    private void confirmCancel(BookingRequest req) {
+        ConfirmDialog dlg = new ConfirmDialog(
+                "Cancel booking?",
+                "Cancel booking " + req.getBookingId() + " for "
+                        + req.getRoom().getRoomName() + "? This cannot be undone.",
+                "Cancel booking", e -> cancel(req),
+                "Keep it", e -> {});
+        dlg.setConfirmButtonTheme("error primary");
+        dlg.open();
     }
 
     private void cancel(BookingRequest req) {

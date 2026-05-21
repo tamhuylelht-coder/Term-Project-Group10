@@ -1,0 +1,24 @@
+# Local dev profile - switches the app onto an embedded H2 datasource running
+# in MySQL compatibility mode, so the same schema.sql + addroom.sql files used
+# against MySQL also work here. No MySQL server required.
+#
+# Activated automatically by spring.profiles.include=local in application.properties.
+
+spring.datasource.url=jdbc:h2:mem:roombooking;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,ROLE;DB_CLOSE_DELAY=-1
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+
+# Run schema + seed scripts on startup. addroom.sql lives in classpath root.
+spring.sql.init.mode=always
+spring.sql.init.schema-locations=classpath:schema.sql
+spring.sql.init.data-locations=classpath:addroom.sql
+spring.sql.init.continue-on-error=true
+
+# No JPA entities in this project, so don't let Hibernate touch the schema.
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.open-in-view=false
+
+# Enable the H2 web console at /h2-console if you want to poke the DB live.
+spring.h2.console.enabled=true

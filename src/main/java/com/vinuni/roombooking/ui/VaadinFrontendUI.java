@@ -1,13 +1,28 @@
 package com.vinuni.roombooking.ui;
 
+import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.ComponentEventListener;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.formlayout.FormLayout;
+import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vinuni.roombooking.model.Room;
 import com.vinuni.roombooking.service.BookingService;
+import com.vinuni.roombooking.service.DatabaseConnector;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.util.List;
+
 /**
- * Vaadin UI entry point. Acts as a cross-cutting helper for confirmation and
- * error notifications used by every @Route view in {@code ui.views}.
+ * Vaadin UI entry point per the UML diagram.
  *
  * The five Phase-2 views live in {@code com.vinuni.roombooking.ui.views}:
  *   1. LoginView          ("")            - User.authenticate()
@@ -15,32 +30,98 @@ import org.springframework.stereotype.Service;
  *   3. BookingFormView    ("book")        - BookingService.submitRequest()
  *   4. MyBookingsView     ("my-bookings") - BookingRepository.findByUser(), BookingService.cancelBooking()
  *   5. AdminView          ("admin")       - Admin.* + BookingRepository.getPendingQueue()
+ *
+ * This class implements {@link ComponentEventListener} per the UML so cross-cutting
+ * button events from any view can be routed here, and exposes the UML's
+ * renderRoomAvailability / renderBookingForm methods as Dialog-based shortcuts.
  */
 @Service
-public class VaadinFrontendUI {
+public class VaadinFrontendUI implements ComponentEventListener<ClickEvent<Button>> {
 
     private final BookingService service;
+    private final DatabaseConnector db;
 
-    // Phase 2: replace with real Vaadin Calendar and Form components
-    private Object calendar;    // com.vaadin.flow.component.datepicker.DatePicker
-    private Object bookingForm; // com.vaadin.flow.component.formlayout.FormLayout
+    private final DatePicker calendar = new DatePicker("Pick a date");
+    private final FormLayout bookingForm = new FormLayout();
 
-    public VaadinFrontendUI(BookingService service) {
+    public VaadinFrontendUI(BookingService service, DatabaseConnector db) {
         this.service = service;
+        this.db = db;
+        calendar.setValue(LocalDate.now());
     }
 
     /**
-     * Replaced by {@code RoomListView} (@Route("rooms")). Kept for UML parity.
+     * Opens a dialog showing today's room availability snapshot.
      */
     public void renderRoomAvailability() {
-        // See ui.views.RoomListView
+        Dialog dlg = new Dialog();
+        dlg.setHeaderTitle("Room availability");
+
+        List<Room> rooms = db.findAllRooms();
+        dlg.add(new H3("Availability for " + calendar.getValue()));
+        dlg.add(calendar);
+        if (rooms == null || rooms.isEmpty()) {
+            dlg.add(new Paragraph("No rooms configured."));
+        } else {
+            for (Room r : rooms) {
+                String line = r.getRoomName() + " (cap " + r.getCapacity() + ", "
+                        + r.getAccess().name() + ") - "
+                        + (r.isAvailable() ? "AVAILABLE" : r.getStatus().name());
+                Paragraph p = new Paragraph(line);
+                p.getStyle().set("margin", "0.25rem 0");
+                dlg.add(p);
+            }
+        }
+        Button close = new Button("Close", e -> dlg.close());
+        dlg.getFooter().add(close);
+        dlg.open();
     }
 
     /**
-     * Replaced by {@code BookingFormView} (@Route("book")). Kept for UML parity.
+     * Opens a dialog with a {@link FormLayout} that hosts the booking form.
+     * Used by views that want a modal booking shortcut without navigating to /book.
      */
     public void renderBookingForm() {
-        // See ui.views.BookingFormView
+        Dialog dlg = new Dialog();
+        dlg.setHeaderTitle("Quick book");
+        bookingForm.removeAll();
+        bookingForm.add(new Paragraph(
+                "Open the Rooms page and pick a room to start a booking."));
+        HorizontalLayout actions = new HorizontalLayout();
+        Button goRooms = new Button("Go to rooms", e -> {
+            dlg.close();
+            UI.getCurrent().navigate("rooms");
+        });
+        Button close = new Button("Close", e -> dlg.close());
+        actions.add(goRooms, close);
+        dlg.add(bookingForm);
+        dlg.getFooter().add(actions);
+        dlg.open();
+    }
+
+    /**
+     * UML-mandated cross-cutting handler. Routes a button click to a sensible
+     * default: an unmapped button just shows a confirmation. Views typically
+     * attach their own ClickListeners instead, so this is a fallback.
+     */
+    @Override
+    public void onComponentEvent(ClickEvent<Button> event) {
+        Component src = event.getSource();
+        String label = src instanceof Button b && b.getText() != null
+                ? b.getText() : src.getClass().getSimpleName();
+        showConfirmation("Action: " + label);
+    }
+
+    public DatePicker getCalendar() {
+        return calendar;
+    }
+
+    public FormLayout getBookingForm() {
+        return bookingForm;
+    }
+
+    public BookingService getBookingService() {
+        return service;
     }
 
     /**
