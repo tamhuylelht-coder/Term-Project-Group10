@@ -56,5 +56,6 @@ CREATE TABLE invitations(
 
     FOREIGN KEY(booking_id) REFERENCES bookings(booking_id),
     FOREIGN KEY(user_id) REFERENCES users(user_id)
+    UNIQUE KEY unique_invitation (booking_id, user_id);
 )
 
