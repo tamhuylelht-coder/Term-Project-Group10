@@ -277,6 +277,34 @@ public class DatabaseConnector {
     }
 
 
+    public List<User> searchUsers(String userName, String excludeUserId, int limit){
+        try{
+            String query = """
+                        SELECT * FROM users
+                        WHERE user_name LIKE ? AND user_id <> ?
+                        ORDER BY user_name LIMIT ?
+                        """;
+            PreparedStatement ps = connection.prepareStatement(query);
+            ps.setString(1, userName);
+            ps.setString(2, excludeUserId);
+            ps.setInt(3, limit);
+
+            ResultSet rs = ps.executeQuery();
+            if(!rs.next()){return null;}
+
+            List<User> userList = new ArrayList<>();
+            while(rs.next()){
+                String userId = rs.getString("user_id");
+                User user = findUserById(userId);
+                userList.add(user);
+            }
+            return userList;
+        }
+        catch (SQLException e){
+            throw new IllegalStateException("Cannot make query: " + e);
+        }
+    }
+
     public List<String> findUserAuthByName(String name){
         try{
             PreparedStatement ps = connection.prepareStatement(
