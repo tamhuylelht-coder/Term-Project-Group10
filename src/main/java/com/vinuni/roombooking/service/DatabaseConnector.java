@@ -524,6 +524,32 @@ public class DatabaseConnector {
         
     }
     
+
+    
+
+    public void insertInvitation(String bookingId, String userId){
+        String status = "PENDING";
+        Timestamp invitedAt = Timestamp.valueOf(LocalDateTime.now());
+        try{
+            String query = """
+                    INSERT INTO invitations (booking_id, user_id, invitation_status, invited_at)
+                    VALUES (?, ?, ?, ?)
+                    """;
+            PreparedStatement ps = connection.prepareStatement(query);
+            ps.setString(1, bookingId);
+            ps.setString(2, userId);
+            ps.setString(3, status);
+            ps.setTimestamp(4, invitedAt);   
+        }
+        catch(SQLException e){
+            if(e.getMessage().contains("unique") || e.getMessage().contains("duplicate")){
+                return;
+            }
+            else{
+                throw new IllegalStateException("Cannot make query: " + e); 
+            }
+        }
+    }
     
 
 
