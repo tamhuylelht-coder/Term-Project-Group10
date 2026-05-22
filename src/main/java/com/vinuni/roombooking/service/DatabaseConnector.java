@@ -10,6 +10,7 @@ import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.enums.BookingStatus;
+import com.vinuni.roombooking.enums.InvitationStatus;
 import com.vinuni.roombooking.repository.BookingRepository;
 
 import jakarta.annotation.PostConstruct;
@@ -540,6 +541,7 @@ public class DatabaseConnector {
             ps.setString(2, userId);
             ps.setString(3, status);
             ps.setTimestamp(4, invitedAt);   
+            ps.executeUpdate();
         }
         catch(SQLException e){
             if(e.getMessage().contains("unique") || e.getMessage().contains("duplicate")){
@@ -552,6 +554,22 @@ public class DatabaseConnector {
     }
     
 
+    public void updateInvitationStatus(String bookingId, String userId, InvitationStatus status){
+        try{
+            String query = """
+                    UPDATE invitations SET invitation_status = ?
+                    WHERE booking_id = ? AND user_id = ?
+                    """;
+            PreparedStatement ps = connection.prepareStatement(query);
+            ps.setString(1, status.name());
+            ps.setString(2, bookingId);
+            ps.setString(3, userId);
+            ps.executeUpdate();
+        }
+        catch(SQLException e){
+            throw new IllegalStateException("Cannot make query: "+ e);
+        }
+    }
 
     /**
      * STUB — Phase 2 (Huy Tam): close connection gracefully.
