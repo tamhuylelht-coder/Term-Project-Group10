@@ -39,21 +39,35 @@ public class BookingService {
     /**
      * CONTRACT — Submit a booking request through validation and persist it.
      *
-     * STUB returns APPROVED unconditionally.
-     * Phase 2: run all six validator rules; set status to PENDING, then
-     *          call repository.save(req) and dbConnector.insertBooking(req).
+     * The {@code inviteeCount} arg drives the minimum-participation check
+     * (see {@link BookingValidator#validateMinimumParticipation}). FE passes
+     * the number of invitees the host picked in the form.
      */
-    public BookingStatus submitRequest(BookingRequest req) {
+    public BookingStatus submitRequest(BookingRequest req, int inviteeCount) {
         if (!validator.validateAccess(req.getRoom(), req.getUser())) return BookingStatus.REJECTED;
         if (!validator.validateDuration(req.getTimeSlot()))           return BookingStatus.REJECTED;
         if (!validator.validateAdvanceWindow(req.getTimeSlot()))      return BookingStatus.REJECTED;
         if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
+        if (!validator.validateMinimumParticipation(req.getRoom(), inviteeCount)) return BookingStatus.REJECTED;
         List<BookingRequest> existing = repository.findByRoom(req.getRoom().getRoomId());
         if (validator.detectConflict(req, existing))                  return BookingStatus.REJECTED;
         req.setStatus(BookingStatus.PENDING);
         repository.save(req);
         dbConnector.insertBooking(req); // Insert booking information into MySQL database
         return BookingStatus.APPROVED;
+    }
+
+    /**
+     * Back-compat wrapper for callers that haven't moved to the 2-arg form.
+     * Passes 0 as inviteeCount, which fails the minimum-participation check
+     * for any non-trivial room — by design, so silent under-participation
+     * doesn't slip through.
+     *
+     * @deprecated Use {@link #submitRequest(BookingRequest, int)}.
+     */
+    @Deprecated
+    public BookingStatus submitRequest(BookingRequest req) {
+        return submitRequest(req, 0);
     }
 
     /**
@@ -73,15 +87,19 @@ public class BookingService {
     }
 
     /**
-     * CONTRACT — Add an RSVP entry for the given user on a booking.
+     * Self-RSVP path against the legacy {@code rsvp} table.
      *
-     * STUB returns true unconditionally.
-     * Phase 2: look up booking, delegate to req.addRsvp(user.getUserId()).
+     * @deprecated Bookings are invite-only now (see invitations table).
+     *             No FE caller relies on this; kept for back-compat with
+     *             existing tests. Will be removed once those are migrated.
      */
+    @Deprecated
     public boolean addRsvp(String bookingId, User user) {
         BookingRequest req = repository.findById(bookingId);
         if (req == null) return false;
-        return req.addRsvp(user.getUserId());
+        if (dbConnector.hasRsvp(bookingId, user.getUserId())) return false;
+        dbConnector.insertRsvp(bookingId, user.getUserId());
+        return true;
     }
 
     // -------------------------------------------------------------------------
