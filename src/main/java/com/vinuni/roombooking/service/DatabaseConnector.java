@@ -808,8 +808,32 @@ public class DatabaseConnector {
     }
 
     /**
+     * DB-backed overlap check for the room/time the caller wants to book.
+     * Overlap predicate: {@code start_time < end AND end_time > start}. Rows
+     * in CANCELLED or REJECTED states are ignored so a previously freed slot
+     * is reusable.
+     *
+     * @return true if some live booking already covers any part of [start, end).
+     */
+    public boolean hasRoomConflict(int roomId, LocalDateTime start, LocalDateTime end){
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM bookings " +
+                "WHERE room_id = ? AND start_time < ? AND end_time > ? " +
+                "AND booking_status NOT IN ('CANCELLED', 'REJECTED') " +
+                "LIMIT 1");
+            ps.setInt(1, roomId);
+            ps.setTimestamp(2, Timestamp.valueOf(end));
+            ps.setTimestamp(3, Timestamp.valueOf(start));
+            return ps.executeQuery().next();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot check room conflict: " + e);
+        }
+    }
+
+    /**
      * Count of ACCEPTED invitations on a booking. The attendee count under
-     * the Outlook-style invite-only model — replaces the legacy
+     * the invite-only model — replaces the legacy
      * {@link #countRsvps} reads.
      */
     public int countAcceptedInvitees(String bookingId){

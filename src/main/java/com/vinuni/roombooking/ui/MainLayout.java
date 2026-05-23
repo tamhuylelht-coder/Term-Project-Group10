@@ -15,9 +15,9 @@ import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.ui.views.AdminView;
 import com.vinuni.roombooking.ui.views.BrowseBookingsView;
+import com.vinuni.roombooking.ui.views.CalendarView;
 import com.vinuni.roombooking.ui.views.LoginView;
 import com.vinuni.roombooking.ui.views.MyBookingsView;
-import com.vinuni.roombooking.ui.views.RoomListView;
 
 /**
  * Top-bar layout for all authenticated views. Redirects to LoginView when
@@ -33,7 +33,7 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
                 .set("font-weight", "600");
 
         HorizontalLayout nav = new HorizontalLayout(
-                styledNav(new RouterLink("Rooms", RoomListView.class)),
+                styledNav(new RouterLink("Calendar", CalendarView.class)),
                 styledNav(new RouterLink("My Bookings", MyBookingsView.class)),
                 styledNav(new RouterLink("Browse", BrowseBookingsView.class))
         );

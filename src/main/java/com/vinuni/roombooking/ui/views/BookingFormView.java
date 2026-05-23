@@ -31,7 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * View 3 - Booking form. Time slot picker, invitee picker (Outlook-style),
+ * View 3 - Booking form. Time slot picker, invitee picker,
  * and submit. Calls BookingService.submitRequest() and routes to My Bookings
  * on success. Invitees the host picked get rows written to the invitations
  * table with status PENDING; they'll see an Accept / Decline pair in their
@@ -96,8 +96,8 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
                 .set("font-weight", "600");
         submitBtn.addClickListener(e -> submit());
 
-        Button back = new Button("Back to rooms",
-                e -> getUI().ifPresent(ui -> ui.navigate("rooms")));
+        Button back = new Button("Back to calendar",
+                e -> getUI().ifPresent(ui -> ui.navigate("calendar")));
         back.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
 
         HorizontalLayout pickerRow = new HorizontalLayout(startPicker, endPicker);
@@ -140,7 +140,7 @@ public class BookingFormView extends VerticalLayout implements HasUrlParameter<I
     public void setParameter(BeforeEvent event, @OptionalParameter Integer roomId) {
         if (roomId == null) {
             heading.setText("No room selected");
-            subtitle.setText("Open the Rooms page and click Book on a room.");
+            subtitle.setText("Open Calendar and click New booking.");
             submitBtn.setEnabled(false);
             return;
         }

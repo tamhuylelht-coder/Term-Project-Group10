@@ -1,7 +1,7 @@
 package com.vinuni.roombooking.enums;
 
 /**
- * Response state of an invitation in the invitations table. Mirrors Outlook
+ * Response state of an invitation in the invitations table. Standard
  * meeting-response semantics:
  *   PENDING  - host invited the user; they haven't clicked Accept or Decline yet.
  *   ACCEPTED - user clicked Accept; they're attending.

@@ -10,6 +10,8 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vinuni.roombooking.enums.AccessLevel;
@@ -27,12 +29,20 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * View 2 - Room listing. Filters by AccessLevel and Room.isAvailable().
- * "Book" button routes to BookingFormView with the chosen roomId.
+ * Legacy room listing. Calendar is now the primary booking surface, so
+ * {@code /rooms} forwards to {@code /calendar} on entry — the body below
+ * is kept available for internal use but is never rendered for routed
+ * visits.
  */
 @Route(value = "rooms", layout = MainLayout.class)
 @PageTitle("Rooms")
-public class RoomListView extends VerticalLayout {
+public class RoomListView extends VerticalLayout implements BeforeEnterObserver {
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        event.forwardTo(CalendarView.class);
+    }
+
 
     private final DatabaseConnector db;
     private final Grid<Room> grid = new Grid<>(Room.class, false);
