@@ -46,3 +46,16 @@ CREATE TABLE rsvp (
     FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
+
+CREATE TABLE invitations(
+    invitation_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    booking_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    invitation_status ENUM('PENDING', 'ACCEPTED', 'DECLINED') NOT NULL,
+    invited_at DATETIME NOT NULL,
+
+    FOREIGN KEY(booking_id) REFERENCES bookings(booking_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id)
+    UNIQUE KEY unique_invitation (booking_id, user_id);
+)
+
