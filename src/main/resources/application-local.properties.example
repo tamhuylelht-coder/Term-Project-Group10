@@ -1,0 +1,54 @@
+# ============================================================
+# LOCAL DEV CONFIG — turnkey, no MySQL required
+# ============================================================
+#
+# HOW TO USE
+#   1. Rename this file:   application-local.properties.example
+#                       -> application-local.properties
+#      (i.e. drop the ".example" suffix)
+#   2. Run:                ./mvnw spring-boot:run
+#   3. Open:               http://localhost:8080
+#   4. Log in as one of the seeded demo accounts:
+#        alice / pass   (Student)
+#        bob   / pass   (Staff)
+#        carol / pass   (Admin)
+#
+# WHY THIS FILE EXISTS
+#   - application.properties points at MySQL with placeholder credentials,
+#     so a fresh checkout won't boot against it.
+#   - This override switches the datasource to an embedded H2 instance that
+#     auto-runs schema.sql + addroom.sql on every boot, so all 137 VinUni
+#     rooms are seeded automatically.
+#   - LocalDevSeeder (gated by @Profile("local")) inserts the three demo
+#     users via the same BCrypt-aware insertUser path the prod flow uses.
+#   - Activated by `spring.profiles.include=local` in application.properties.
+#
+# Your renamed copy (application-local.properties) is gitignored, so it
+# stays out of version control. Delete it to fall back to the team's MySQL
+# config in application.properties.
+
+# --- H2 in-memory, MySQL compatibility mode ---
+# DB_CLOSE_DELAY=-1 keeps the in-memory DB alive across connection cycles.
+# NON_KEYWORDS=USER,ROLE lets us use those words as identifiers.
+spring.datasource.url=jdbc:h2:mem:roombooking;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,ROLE;DB_CLOSE_DELAY=-1
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+
+# --- Auto-run schema + seed on every boot ---
+# Without these, Spring would only pick up a file literally named data.sql.
+# addroom.sql lives in classpath root (src/main/resources/).
+spring.sql.init.mode=always
+spring.sql.init.schema-locations=classpath:schema.sql
+spring.sql.init.data-locations=classpath:addroom.sql
+spring.sql.init.continue-on-error=true
+
+# --- No JPA entities in this project; keep Hibernate hands-off. ---
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.open-in-view=false
+
+# --- H2 web console at /h2-console (handy for inspecting seed data) ---
+#   JDBC URL: jdbc:h2:mem:roombooking
+#   User:     sa     (password blank)
+spring.h2.console.enabled=true
