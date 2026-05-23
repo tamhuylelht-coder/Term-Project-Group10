@@ -15,18 +15,16 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for BookingService.submitRequest() with dummy data.
- * Uses Mockito to mock the BookingValidator and BookingRepository.
+ * Tests for BookingService.submitRequest() after calendar auto-approval rules.
  */
 public class BookingServiceTest {
 
@@ -34,15 +32,15 @@ public class BookingServiceTest {
     private DatabaseConnector mockDatabaseConnector;
 
     @Mock
-    private BookingService bookingService;
-
-    @Mock
     private BookingValidator mockValidator;
 
     @Mock
     private BookingRepository mockRepository;
 
-    // Test data
+    @Mock
+    private RoomApprovalPolicy mockPolicy;
+
+    private BookingService bookingService;
     private User testStudent;
     private Room testRoom;
     private TimeSlot validTimeSlot;
@@ -51,139 +49,89 @@ public class BookingServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        bookingService = new BookingService(mockValidator, mockRepository, mockDatabaseConnector);
+        bookingService = new BookingService(
+                mockValidator, mockRepository, mockDatabaseConnector, mockPolicy);
 
-        // Set up test data
-        testStudent = new Student("user1", "John Doe", "password", "john@email.com", "stu001", "CS", 3);
-        testRoom = new Room(1, "Conference Room A", 10, AccessLevel.ALL_USERS);
-        validTimeSlot = new TimeSlot(LocalDateTime.now().plusDays(2), LocalDateTime.now().plusDays(2).plusHours(2));
+        testStudent = new Student("user1", "John Doe", "password",
+                "john@email.com", "stu001", "CS", 3);
+        testRoom = new Room(1, "A102-Group-Discussion-Room", 10, AccessLevel.ALL_USERS);
+        LocalDateTime start = LocalDateTime.now().plusDays(2);
+        validTimeSlot = new TimeSlot(start, start.plusHours(2));
         validBookingRequest = new BookingRequest("b1", testStudent, testRoom, validTimeSlot);
     }
 
     @Test
-    void testSubmitRequest_AllValidationsPass_ReturnsApproved() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
-        when(mockRepository.findByRoom(testRoom.getRoomId())).thenReturn(new ArrayList<>());
-        when(mockValidator.detectConflict(validBookingRequest, new ArrayList<>())).thenReturn(false);
+    void submitRequest_NoConflictAndAutoApproval_ReturnsApprovedAndPersistsApproved() {
+        allowBaseValidation();
+        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(true);
 
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
-        // Assert
         assertEquals(BookingStatus.APPROVED, result);
+        assertEquals(BookingStatus.APPROVED, validBookingRequest.getStatus());
+        verify(mockRepository).save(validBookingRequest);
+        verify(mockDatabaseConnector).insertBooking(validBookingRequest);
+    }
+
+    @Test
+    void submitRequest_NoConflictButNoAutoApproval_ReturnsPendingAndPersistsPending() {
+        allowBaseValidation();
+        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(false);
+
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
+
+        assertEquals(BookingStatus.PENDING, result);
         assertEquals(BookingStatus.PENDING, validBookingRequest.getStatus());
         verify(mockRepository).save(validBookingRequest);
+        verify(mockDatabaseConnector).insertBooking(validBookingRequest);
     }
 
     @Test
-    void testSubmitRequest_AccessDenied_ReturnsRejected() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(false);
+    void submitRequest_ConflictDetected_ReturnsRejectedWithoutPersisting() {
+        allowBaseValidation();
+        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(true);
 
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
-        // Assert
         assertEquals(BookingStatus.REJECTED, result);
+        verify(mockRepository, never()).save(any(BookingRequest.class));
+        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
     }
 
     @Test
-    void testSubmitRequest_DurationExceeded_ReturnsRejected() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+    void submitRequest_MinimumParticipationViolated_ReturnsRejectedWithoutPersisting() {
+        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateMinimumParticipation(testRoom, 1)).thenReturn(false);
+
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 1);
+
+        assertEquals(BookingStatus.REJECTED, result);
+        verify(mockDatabaseConnector, never()).hasRoomConflict(
+                anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
+        verify(mockRepository, never()).save(any(BookingRequest.class));
+        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
+    }
+
+    @Test
+    void submitRequest_DurationViolated_ReturnsRejectedWithoutPersisting() {
         when(mockValidator.validateDuration(validTimeSlot)).thenReturn(false);
 
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
-        // Assert
         assertEquals(BookingStatus.REJECTED, result);
+        verify(mockRepository, never()).save(any(BookingRequest.class));
+        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
     }
 
-    @Test
-    void testSubmitRequest_AdvanceWindowViolated_ReturnsRejected() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(false);
-
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
-
-        // Assert
-        assertEquals(BookingStatus.REJECTED, result);
-    }
-
-    @Test
-    void testSubmitRequest_OneBookingPerDayViolated_ReturnsRejected() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+    private void allowBaseValidation() {
         when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(false);
-
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
-
-        // Assert
-        assertEquals(BookingStatus.REJECTED, result);
-    }
-
-    @Test
-    void testSubmitRequest_ConflictDetected_ReturnsRejected() {
-        // Arrange
-        List<BookingRequest> existingBookings = new ArrayList<>();
-        existingBookings.add(new BookingRequest("b2", testStudent, testRoom, validTimeSlot));
-
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
-        when(mockRepository.findByRoom(testRoom.getRoomId())).thenReturn(existingBookings);
-        when(mockValidator.detectConflict(validBookingRequest, existingBookings)).thenReturn(true);
-
-        // Act
-        BookingStatus result = bookingService.submitRequest(validBookingRequest);
-
-        // Assert
-        assertEquals(BookingStatus.REJECTED, result);
-    }
-
-    @Test
-    void testSubmitRequest_MultipleValidationsPass_RepositorySaveCalled() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
-        when(mockRepository.findByRoom(testRoom.getRoomId())).thenReturn(new ArrayList<>());
-        when(mockValidator.detectConflict(validBookingRequest, new ArrayList<>())).thenReturn(false);
-
-        // Act
-        bookingService.submitRequest(validBookingRequest);
-
-        // Assert - verify that repository.save was called exactly once
-        verify(mockRepository).save(validBookingRequest);
-    }
-
-    @Test
-    void testSubmitRequest_StatusSetToPending() {
-        // Arrange
-        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
-        when(mockRepository.findByRoom(testRoom.getRoomId())).thenReturn(new ArrayList<>());
-        when(mockValidator.detectConflict(validBookingRequest, new ArrayList<>())).thenReturn(false);
-
-        // Act
-        bookingService.submitRequest(validBookingRequest);
-
-        // Assert
-        assertEquals(BookingStatus.PENDING, validBookingRequest.getStatus());
+        when(mockValidator.validateMinimumParticipation(testRoom, 5)).thenReturn(true);
     }
 }

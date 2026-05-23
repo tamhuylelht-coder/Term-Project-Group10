@@ -28,7 +28,7 @@ public class BookingValidator {
     }
 
     /**
-     * Outlook-style minimum-participation rule: the host must invite at least
+     * Minimum-participation rule: the host must invite at least
      * ceil(capacity * 0.5) people. Prevents one user from grabbing a large
      * room for a solo session. FE pre-checks this for a better error message;
      * the service calls it as a defense-in-depth backstop.

@@ -117,7 +117,7 @@ public class LoginView extends VerticalLayout {
 
             SessionUtil.setCurrentUser(user);
             frontend.showConfirmation("Welcome, " + user.getUserName());
-            getUI().ifPresent(ui -> ui.navigate("rooms"));
+            getUI().ifPresent(ui -> ui.navigate("calendar"));
         } catch (BadCredentialsException ex) {
             frontend.showError("Wrong username or password");
         } catch (AuthenticationException ex) {

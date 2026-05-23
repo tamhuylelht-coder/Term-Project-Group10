@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * View 6 - Browse view (Outlook-strict invite-only).
+ * View 6 - Browse view (strict invite-only).
  *
  *   <b>Your invitations</b> — bookings the host invited you to.
  *   Accept / Decline buttons write to the invitations table; the booking

@@ -86,14 +86,14 @@ public class VaadinFrontendUI implements ComponentEventListener<ClickEvent<Butto
         dlg.setHeaderTitle("Quick book");
         bookingForm.removeAll();
         bookingForm.add(new Paragraph(
-                "Open the Rooms page and pick a room to start a booking."));
+                "Open Calendar and click New booking to start a booking."));
         HorizontalLayout actions = new HorizontalLayout();
-        Button goRooms = new Button("Go to rooms", e -> {
+        Button goCalendar = new Button("Open calendar", e -> {
             dlg.close();
-            UI.getCurrent().navigate("rooms");
+            UI.getCurrent().navigate("calendar");
         });
         Button close = new Button("Close", e -> dlg.close());
-        actions.add(goRooms, close);
+        actions.add(goCalendar, close);
         dlg.add(bookingForm);
         dlg.getFooter().add(actions);
         dlg.open();

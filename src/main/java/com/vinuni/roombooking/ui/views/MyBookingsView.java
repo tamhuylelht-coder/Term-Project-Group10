@@ -39,7 +39,7 @@ public class MyBookingsView extends VerticalLayout {
     private final VaadinFrontendUI frontend;
     private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
     private final Paragraph emptyState = new Paragraph(
-            "No bookings yet. Open the Rooms page to book one.");
+            "No bookings yet. Open Calendar and click New booking to create one.");
 
     public MyBookingsView(BookingRepository repository,
                           BookingService service,
