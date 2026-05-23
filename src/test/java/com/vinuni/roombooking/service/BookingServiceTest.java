@@ -11,35 +11,22 @@ import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Tests for BookingService.submitRequest() after calendar auto-approval rules.
  */
 public class BookingServiceTest {
 
-    @Mock
-    private DatabaseConnector mockDatabaseConnector;
-
-    @Mock
-    private BookingValidator mockValidator;
-
-    @Mock
-    private BookingRepository mockRepository;
-
-    @Mock
-    private RoomApprovalPolicy mockPolicy;
-
+    private FakeDatabaseConnector db;
+    private FakeBookingValidator validator;
+    private FakeBookingRepository repository;
+    private FakeRoomApprovalPolicy policy;
     private BookingService bookingService;
     private User testStudent;
     private Room testRoom;
@@ -48,9 +35,11 @@ public class BookingServiceTest {
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        bookingService = new BookingService(
-                mockValidator, mockRepository, mockDatabaseConnector, mockPolicy);
+        db = new FakeDatabaseConnector();
+        validator = new FakeBookingValidator();
+        repository = new FakeBookingRepository();
+        policy = new FakeRoomApprovalPolicy();
+        bookingService = new BookingService(validator, repository, db, policy);
 
         testStudent = new Student("user1", "John Doe", "password",
                 "john@email.com", "stu001", "CS", 3);
@@ -63,75 +52,127 @@ public class BookingServiceTest {
     @Test
     void submitRequest_NoConflictAndAutoApproval_ReturnsApprovedAndPersistsApproved() {
         allowBaseValidation();
-        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(false);
-        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(true);
+        db.conflict = false;
+        policy.autoApprove = true;
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
         assertEquals(BookingStatus.APPROVED, result);
         assertEquals(BookingStatus.APPROVED, validBookingRequest.getStatus());
-        verify(mockRepository).save(validBookingRequest);
-        verify(mockDatabaseConnector).insertBooking(validBookingRequest);
+        assertSame(validBookingRequest, repository.savedRequest);
+        assertSame(validBookingRequest, db.insertedRequest);
     }
 
     @Test
     void submitRequest_NoConflictButNoAutoApproval_ReturnsPendingAndPersistsPending() {
         allowBaseValidation();
-        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(false);
-        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(false);
+        db.conflict = false;
+        policy.autoApprove = false;
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
         assertEquals(BookingStatus.PENDING, result);
         assertEquals(BookingStatus.PENDING, validBookingRequest.getStatus());
-        verify(mockRepository).save(validBookingRequest);
-        verify(mockDatabaseConnector).insertBooking(validBookingRequest);
+        assertSame(validBookingRequest, repository.savedRequest);
+        assertSame(validBookingRequest, db.insertedRequest);
     }
 
     @Test
     void submitRequest_ConflictDetected_ReturnsRejectedWithoutPersisting() {
         allowBaseValidation();
-        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(true);
+        db.conflict = true;
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
         assertEquals(BookingStatus.REJECTED, result);
-        verify(mockRepository, never()).save(any(BookingRequest.class));
-        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
+        assertNull(repository.savedRequest);
+        assertNull(db.insertedRequest);
     }
 
     @Test
     void submitRequest_MinimumParticipationViolated_ReturnsRejectedWithoutPersisting() {
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateMinimumParticipation(testRoom, 1)).thenReturn(false);
+        validator.durationValid = true;
+        validator.advanceWindowValid = true;
+        validator.minimumParticipationValid = false;
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 1);
 
         assertEquals(BookingStatus.REJECTED, result);
-        verify(mockDatabaseConnector, never()).hasRoomConflict(
-                anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
-        verify(mockRepository, never()).save(any(BookingRequest.class));
-        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
+        assertEquals(0, db.conflictChecks);
+        assertNull(repository.savedRequest);
+        assertNull(db.insertedRequest);
     }
 
     @Test
     void submitRequest_DurationViolated_ReturnsRejectedWithoutPersisting() {
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(false);
+        validator.durationValid = false;
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
         assertEquals(BookingStatus.REJECTED, result);
-        verify(mockRepository, never()).save(any(BookingRequest.class));
-        verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
+        assertNull(repository.savedRequest);
+        assertNull(db.insertedRequest);
     }
 
     private void allowBaseValidation() {
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
-        when(mockValidator.validateMinimumParticipation(testRoom, 5)).thenReturn(true);
+        validator.durationValid = true;
+        validator.advanceWindowValid = true;
+        validator.minimumParticipationValid = true;
+    }
+
+    private static class FakeDatabaseConnector extends DatabaseConnector {
+        boolean conflict;
+        int conflictChecks;
+        BookingRequest insertedRequest;
+
+        @Override
+        public boolean hasRoomConflict(int roomId, LocalDateTime start, LocalDateTime end) {
+            conflictChecks++;
+            return conflict;
+        }
+
+        @Override
+        public void insertBooking(BookingRequest req) {
+            insertedRequest = req;
+        }
+    }
+
+    private static class FakeBookingValidator extends BookingValidator {
+        boolean durationValid;
+        boolean advanceWindowValid;
+        boolean minimumParticipationValid;
+
+        @Override
+        public boolean validateDuration(TimeSlot slot) {
+            return durationValid;
+        }
+
+        @Override
+        public boolean validateAdvanceWindow(TimeSlot slot) {
+            return advanceWindowValid;
+        }
+
+        @Override
+        public boolean validateMinimumParticipation(Room room, int inviteeCount) {
+            return minimumParticipationValid;
+        }
+    }
+
+    private static class FakeBookingRepository extends BookingRepository {
+        BookingRequest savedRequest;
+
+        @Override
+        public void save(BookingRequest req) {
+            savedRequest = req;
+        }
+    }
+
+    private static class FakeRoomApprovalPolicy extends RoomApprovalPolicy {
+        boolean autoApprove;
+
+        @Override
+        public boolean canAutoApprove(Room room, User user) {
+            return autoApprove;
+        }
     }
 }
