@@ -66,7 +66,7 @@ public class MyBookingsView extends VerticalLayout {
                 .setHeader("End").setAutoWidth(true);
         grid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
                 .setHeader("Status").setAutoWidth(true);
-        grid.addColumn(r -> db.countRsvps(r.getBookingId())).setHeader("RSVPs").setAutoWidth(true);
+        grid.addColumn(r -> db.countAcceptedInvitees(r.getBookingId())).setHeader("Attending").setAutoWidth(true);
         grid.addComponentColumn(this::buildCancelButton).setHeader("").setAutoWidth(true);
         grid.setSizeFull();
         grid.getStyle()

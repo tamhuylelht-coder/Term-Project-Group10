@@ -1,9 +1,7 @@
 package com.vinuni.roombooking.validator;
 
-import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,47 +40,6 @@ public class BookingValidatorTest {
         LocalDateTime end = start.plusHours(4); // 4 hours, exceeds 3
         TimeSlot slot = new TimeSlot(start, end);
         assertFalse(validator.validateDuration(slot));
-    }
-
-    @Test
-    void testValidateRsvp_Valid() throws Exception {
-        Room room = new Room(1, "Room A", 10, AccessLevel.ALL_USERS);
-        User user = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
-        TimeSlot slot = new TimeSlot(LocalDateTime.now(), LocalDateTime.now().plusHours(1));
-        BookingRequest req = new BookingRequest("b1", user, room, slot);
-
-        // Set rsvpList to have 5 RSVPs (50% of 10)
-        Field rsvpField = BookingRequest.class.getDeclaredField("rsvpList");
-        rsvpField.setAccessible(true);
-        HashSet<String> rsvpList = new HashSet<>();
-        rsvpList.add("u1");
-        rsvpList.add("u2");
-        rsvpList.add("u3");
-        rsvpList.add("u4");
-        rsvpList.add("u5");
-        rsvpField.set(req, rsvpList);
-
-        assertTrue(validator.validateRsvp(req));
-    }
-
-    @Test
-    void testValidateRsvp_Invalid() throws Exception {
-        Room room = new Room(1, "Room A", 10, AccessLevel.ALL_USERS);
-        User user = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
-        TimeSlot slot = new TimeSlot(LocalDateTime.now(), LocalDateTime.now().plusHours(1));
-        BookingRequest req = new BookingRequest("b1", user, room, slot);
-
-        // Set rsvpList to have 4 RSVPs (40% of 10, less than 50%)
-        Field rsvpField = BookingRequest.class.getDeclaredField("rsvpList");
-        rsvpField.setAccessible(true);
-        HashSet<String> rsvpList = new HashSet<>();
-        rsvpList.add("u1");
-        rsvpList.add("u2");
-        rsvpList.add("u3");
-        rsvpList.add("u4");
-        rsvpField.set(req, rsvpList);
-
-        assertFalse(validator.validateRsvp(req));
     }
 
     @Test

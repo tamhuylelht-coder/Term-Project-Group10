@@ -5,14 +5,13 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vinuni.roombooking.enums.BookingStatus;
-import com.vinuni.roombooking.model.BookingRequest;
+import com.vinuni.roombooking.enums.InvitationStatus;
+import com.vinuni.roombooking.model.Invitation;
 import com.vinuni.roombooking.model.User;
-import com.vinuni.roombooking.repository.BookingRepository;
-import com.vinuni.roombooking.service.BookingService;
 import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
@@ -20,11 +19,19 @@ import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * View 6 - Browse approved bookings hosted by other users and RSVP to attend.
- * Calls BookingService.addRsvp() and DatabaseConnector.insertRsvp() so RSVP
- * counts survive a restart.
+ * View 6 - Browse view (Outlook-strict invite-only).
+ *
+ *   <b>Your invitations</b> — bookings the host invited you to.
+ *   Accept / Decline buttons write to the invitations table; the booking
+ *   no longer has a public self-RSVP path. PENDING sort to the top so the
+ *   action items are obvious.
+ *
+ * The previous "Open bookings" section was removed per the invite-only
+ * design decision (handoff doc §A1) — if you weren't invited, you don't
+ * attend.
  */
 @Route(value = "browse", layout = MainLayout.class)
 @PageTitle("Browse bookings")
@@ -32,106 +39,114 @@ public class BrowseBookingsView extends VerticalLayout {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    private final BookingRepository repository;
-    private final BookingService service;
     private final DatabaseConnector db;
     private final VaadinFrontendUI frontend;
-    private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
-    private final Paragraph emptyState = new Paragraph(
-            "Nothing to RSVP to yet. Approved bookings from other users will show up here.");
 
-    public BrowseBookingsView(BookingRepository repository,
-                              BookingService service,
-                              DatabaseConnector db,
-                              VaadinFrontendUI frontend) {
-        this.repository = repository;
-        this.service = service;
+    private final Grid<Invitation> invitesGrid = new Grid<>(Invitation.class, false);
+    private final Paragraph invitesEmpty = new Paragraph(
+            "No invitations waiting. When someone invites you to a booking, you'll see it here.");
+
+    public BrowseBookingsView(DatabaseConnector db, VaadinFrontendUI frontend) {
         this.db = db;
         this.frontend = frontend;
         setSizeFull();
         getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
 
-        H2 heading = new H2("Browse bookings");
+        H2 heading = new H2("Your invitations");
         heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
         add(heading);
 
         Paragraph hint = new Paragraph(
-                "RSVP to approved bookings from other users to mark yourself as attending.");
+                "Bookings someone invited you to. Click Accept to attend, or Decline to skip.");
         hint.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
         add(hint);
 
-        emptyState.getStyle().set("font-size", "1.1rem");
+        invitesEmpty.getStyle().set("font-size", "1.1rem");
+        buildInvitesGrid();
+        add(invitesEmpty, invitesGrid);
 
-        grid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
-        grid.addColumn(r -> r.getUser().getUserName()).setHeader("Host").setAutoWidth(true);
-        grid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
-        grid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
-                .setHeader("Start").setAutoWidth(true);
-        grid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
-                .setHeader("End").setAutoWidth(true);
-        grid.addColumn(r -> db.countRsvps(r.getBookingId())).setHeader("RSVPs").setAutoWidth(true);
-        grid.addComponentColumn(this::buildRsvpButton).setHeader("").setAutoWidth(true);
-        grid.setSizeFull();
-        grid.getStyle()
-                .set("font-size", "1.05rem")
-                .set("--vaadin-grid-cell-padding", "1rem");
-
-        add(emptyState, grid);
         refresh();
     }
 
-    private Button buildRsvpButton(BookingRequest req) {
-        Button b = new Button("RSVP", e -> rsvp(req));
-        b.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        b.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
-        return b;
+    private void buildInvitesGrid() {
+        invitesGrid.addColumn(i -> i.getBooking().getBookingId()).setHeader("Booking").setAutoWidth(true);
+        invitesGrid.addColumn(i -> i.getBooking().getUser().getUserName()).setHeader("Host").setAutoWidth(true);
+        invitesGrid.addColumn(i -> i.getBooking().getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
+        invitesGrid.addColumn(i -> FMT.format(i.getBooking().getTimeSlot().getStartTime()))
+                .setHeader("Start").setAutoWidth(true);
+        invitesGrid.addColumn(i -> FMT.format(i.getBooking().getTimeSlot().getEndTime()))
+                .setHeader("End").setAutoWidth(true);
+        invitesGrid.addColumn(i -> i.getStatus().name()).setHeader("Your status").setAutoWidth(true);
+        invitesGrid.addComponentColumn(this::buildInviteActions).setHeader("").setAutoWidth(true);
+        invitesGrid.setAllRowsVisible(true);
+        invitesGrid.getStyle()
+                .set("font-size", "1.05rem")
+                .set("--vaadin-grid-cell-padding", "1rem");
+    }
+
+    private HorizontalLayout buildInviteActions(Invitation inv) {
+        Button accept = new Button("Accept", e -> respond(inv, InvitationStatus.ACCEPTED));
+        accept.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
+        accept.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
+
+        Button decline = new Button("Decline", e -> respond(inv, InvitationStatus.DECLINED));
+        decline.addThemeVariants(ButtonVariant.LUMO_ERROR);
+        decline.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
+
+        // Decline is reversible: keep both enabled so a user who declined can
+        // still change their mind, and vice versa. We just gray out the
+        // current state so the active choice is obvious.
+        accept.setEnabled(inv.getStatus() != InvitationStatus.ACCEPTED);
+        decline.setEnabled(inv.getStatus() != InvitationStatus.DECLINED);
+
+        HorizontalLayout row = new HorizontalLayout(accept, decline);
+        row.setSpacing(true);
+        return row;
+    }
+
+    private void respond(Invitation inv, InvitationStatus next) {
+        User user = SessionUtil.getCurrentUser();
+        if (user == null) { frontend.showError("Not logged in"); return; }
+        try {
+            db.updateInvitationStatus(
+                    inv.getBooking().getBookingId(), user.getUserId(), next);
+            frontend.showConfirmation(next == InvitationStatus.ACCEPTED
+                    ? "Accepted invitation to " + inv.getBooking().getBookingId()
+                    : "Declined invitation to " + inv.getBooking().getBookingId());
+        } catch (IllegalStateException ex) {
+            frontend.showError("Could not update invitation: " + ex.getMessage());
+        }
+        refresh();
     }
 
     private void refresh() {
         User user = SessionUtil.getCurrentUser();
         if (user == null) {
-            grid.setItems(List.of());
-            emptyState.setVisible(true);
-            grid.setVisible(false);
+            invitesGrid.setItems(List.of());
+            invitesEmpty.setVisible(true);
+            invitesGrid.setVisible(false);
             return;
         }
-        // Hydrate from DB so addRsvp can find the booking in the in-memory repo.
-        List<BookingRequest> all = db.findAllBookings();
-        for (BookingRequest req : all) repository.save(req);
-
-        List<BookingRequest> browsable = all.stream()
-                .filter(r -> r.getStatus() == BookingStatus.APPROVED)
-                .filter(r -> !r.getUser().getUserId().equals(user.getUserId()))
-                .toList();
-        grid.setItems(browsable);
-        emptyState.setVisible(browsable.isEmpty());
-        grid.setVisible(!browsable.isEmpty());
+        // PENDING first, then by start time — surfaces the action items.
+        List<Invitation> invites = db.findInvitationsByUser(user.getUserId())
+                .stream()
+                .sorted((a, b) -> {
+                    int byStatus = Integer.compare(rank(a.getStatus()), rank(b.getStatus()));
+                    if (byStatus != 0) return byStatus;
+                    return a.getBooking().getTimeSlot().getStartTime()
+                            .compareTo(b.getBooking().getTimeSlot().getStartTime());
+                })
+                .collect(Collectors.toList());
+        invitesGrid.setItems(invites);
+        invitesEmpty.setVisible(invites.isEmpty());
+        invitesGrid.setVisible(!invites.isEmpty());
     }
 
-    private void rsvp(BookingRequest req) {
-        User user = SessionUtil.getCurrentUser();
-        if (user == null) { frontend.showError("Not logged in"); return; }
-        try {
-            // Guard against duplicates that the in-memory rsvpList misses after
-            // a restart (it always starts empty, so service.addRsvp would let a
-            // re-RSVP through even though the DB already has the row).
-            if (db.hasRsvp(req.getBookingId(), user.getUserId())) {
-                frontend.showError("You've already RSVPed to " + req.getBookingId());
-                return;
-            }
-            boolean added = service.addRsvp(req.getBookingId(), user);
-            if (!added) {
-                frontend.showError("You've already RSVPed to " + req.getBookingId());
-                return;
-            }
-            db.insertRsvp(req.getBookingId(), user.getUserId());
-            frontend.showConfirmation("RSVPed to " + req.getBookingId());
-        } catch (IllegalStateException ex) {
-            // Defensive fallback: if a race let two writers through, the second
-            // insert may still fail (no unique constraint today, but possible
-            // future migration). Surface it as a normal user-facing error.
-            frontend.showError("RSVP not recorded: " + ex.getMessage());
-        }
-        refresh();
+    private int rank(InvitationStatus s) {
+        return switch (s) {
+            case PENDING  -> 0;
+            case ACCEPTED -> 1;
+            case DECLINED -> 2;
+        };
     }
 }

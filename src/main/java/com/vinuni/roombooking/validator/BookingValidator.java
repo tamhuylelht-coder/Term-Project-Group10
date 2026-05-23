@@ -23,12 +23,19 @@ public class BookingValidator {
         return false; //no conflict detected
     }
 
-    public boolean validateRsvp(BookingRequest req) {
-        return req.getRsvpCount() >= req.getRoom().getCapacity() * 0.5;
-    }
-
     public boolean validateDuration(TimeSlot slot) {
         return slot.isWithinMaxDuration();
+    }
+
+    /**
+     * Outlook-style minimum-participation rule: the host must invite at least
+     * ceil(capacity * 0.5) people. Prevents one user from grabbing a large
+     * room for a solo session. FE pre-checks this for a better error message;
+     * the service calls it as a defense-in-depth backstop.
+     */
+    public boolean validateMinimumParticipation(Room room, int inviteeCount) {
+        int required = (int) Math.ceil(room.getCapacity() * 0.5);
+        return inviteeCount >= required;
     }
 
     public boolean validateAdvanceWindow(TimeSlot slot) {

@@ -31,7 +31,7 @@ VALUES
     ('A213-Group-Discussion-Room', 3, 'ALL_USERS', 'AVAILABLE'),
     ('A214-Group-Discussion-Room', 3, 'ALL_USERS', 'AVAILABLE'),
     ('A215-Group-Discussion-Room', 3, 'ALL_USERS', 'AVAILABLE'),
-    ('A216-Group-Discussion-Room', 6, 'ALL_USERS', 'OCCUPIED'),
+    ('A216-Group-Discussion-Room', 6, 'ALL_USERS', 'AVAILABLE'),
     ('A217-Group-Discussion-Room', 6, 'ALL_USERS', 'AVAILABLE'),
     ('A218-Prayer-Room', 4, 'ALL_USERS', 'AVAILABLE'),
     ('A3-Babylon-Garden', 200, 'ALL_USERS', 'AVAILABLE'),

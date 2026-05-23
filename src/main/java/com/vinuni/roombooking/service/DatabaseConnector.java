@@ -289,31 +289,33 @@ public class DatabaseConnector {
     }
 
 
-    public List<User> searchUsers(String userName, String excludeUserId, int limit){
+    /**
+     * Case-insensitive prefix search on user_name, used by the invitee
+     * picker. Caller passes a raw query string; the wildcard suffix and
+     * lowercasing are applied here. Always returns a list (never null) so
+     * the UI can iterate without a null check. Self-exclusion via
+     * {@code excludeUserId} stops a host from inviting themselves.
+     */
+    public List<User> searchUsers(String query, String excludeUserId, int limit){
+        String filter = (query == null ? "" : query.trim().toLowerCase()) + "%";
         try{
-            String query = """
-                        SELECT * FROM users
-                        WHERE user_name LIKE ? AND user_id <> ?
-                        ORDER BY user_name LIMIT ?
-                        """;
-            PreparedStatement ps = connection.prepareStatement(query);
-            ps.setString(1, userName);
-            ps.setString(2, excludeUserId);
-            ps.setInt(3, limit);
-
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM users " +
+                "WHERE LOWER(user_name) LIKE ? AND user_id <> ? " +
+                "ORDER BY user_name LIMIT ?");
+            ps.setString(1, filter);
+            ps.setString(2, excludeUserId == null ? "" : excludeUserId);
+            ps.setInt(3, Math.max(1, limit));
             ResultSet rs = ps.executeQuery();
-            if(!rs.next()){return null;}
-
-            List<User> userList = new ArrayList<>();
-            while(rs.next()){
-                String userId = rs.getString("user_id");
-                User user = findUserById(userId);
-                userList.add(user);
+            List<User> out = new ArrayList<>();
+            while (rs.next()) {
+                User u = userFromRow(rs);
+                if (u != null) out.add(u);
             }
-            return userList;
+            return out;
         }
         catch (SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
+            throw new IllegalStateException("Cannot search users: " + e);
         }
     }
 
@@ -651,9 +653,11 @@ public class DatabaseConnector {
 
             User hostUser = findUserById(userId);
             Room roomBooked = findRoomById(roomId);
-            HashSet<String> rsvplist = fetchRsvpList(bookingId);
 
-            BookingRequest req = new BookingRequest(bookingId, hostUser, roomBooked, timeSlot, rsvplist, bookingStatus, createdAt);
+            // BookingRequest no longer caches rsvp/createdAt — the rsvp table
+            // is queried directly by countAcceptedInvitees/hasRsvp when needed.
+            BookingRequest req = new BookingRequest(bookingId, hostUser, roomBooked, timeSlot);
+            req.setStatus(bookingStatus);
             return req;
         }
         catch(SQLException e){
@@ -690,54 +694,188 @@ public class DatabaseConnector {
     
 
     public void insertInvitation(String bookingId, String userId){
-        String status = "PENDING";
-        Timestamp invitedAt = Timestamp.valueOf(LocalDateTime.now());
         try{
-            String query = """
-                    INSERT INTO invitations (booking_id, user_id, invitation_status, invited_at)
-                    VALUES (?, ?, ?, ?)
-                    """;
-            PreparedStatement ps = connection.prepareStatement(query);
+            PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO invitations (booking_id, user_id, status, invited_at) " +
+                "VALUES (?, ?, 'PENDING', ?)");
             ps.setString(1, bookingId);
             ps.setString(2, userId);
-            ps.setString(3, status);
-            ps.setTimestamp(4, invitedAt);   
+            ps.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
             ps.executeUpdate();
         }
         catch(SQLException e){
-            if(e.getMessage().contains("unique") || e.getMessage().contains("duplicate")){
-                return;
-            }
-            else{
-                throw new IllegalStateException("Cannot make query: " + e); 
-            }
+            // Idempotent: swallow duplicate (booking_id, user_id) errors so the
+            // host can re-submit the form without breaking the batch.
+            String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+            if(msg.contains("unique") || msg.contains("duplicate")) return;
+            throw new IllegalStateException("Cannot insert invitation: " + e);
         }
     }
-    
 
     public void updateInvitationStatus(String bookingId, String userId, InvitationStatus status){
         try{
-            String query = """
-                    UPDATE invitations SET invitation_status = ?
-                    WHERE booking_id = ? AND user_id = ?
-                    """;
-            PreparedStatement ps = connection.prepareStatement(query);
+            PreparedStatement ps = connection.prepareStatement(
+                "UPDATE invitations SET status = ? WHERE booking_id = ? AND user_id = ?");
             ps.setString(1, status.name());
             ps.setString(2, bookingId);
             ps.setString(3, userId);
             ps.executeUpdate();
         }
         catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: "+ e);
+            throw new IllegalStateException("Cannot update invitation status: " + e);
         }
     }
 
+    /**
+     * All invitations addressed to {@code userId}, joined with the host
+     * booking + host user + invitee user + room in a single query. Used by
+     * BrowseBookingsView.
+     */
     public List<Invitation> findInvitationsByUser(String userId){
-        try{
-            String query = """
-                    SELECT * FROM invitations where 
-                    """;
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT i.status, i.invited_at, " +
+                "       b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       u.user_id   AS host_user_id,   u.user_name AS host_user_name, " +
+                "       u.user_password AS host_user_password, u.user_email AS host_user_email, " +
+                "       u.user_role AS host_user_role, " +
+                "       u.student_id AS host_student_id, u.student_major AS host_student_major, " +
+                "       u.year_of_study AS host_year_of_study, " +
+                "       u.staff_id AS host_staff_id, u.staff_department AS host_staff_department, " +
+                "       u.admin_id AS host_admin_id, " +
+                "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status, " +
+                "       inv.user_id AS invitee_user_id, inv.user_name AS invitee_user_name, " +
+                "       inv.user_password AS invitee_user_password, inv.user_email AS invitee_user_email, " +
+                "       inv.user_role AS invitee_user_role, " +
+                "       inv.student_id AS invitee_student_id, inv.student_major AS invitee_student_major, " +
+                "       inv.year_of_study AS invitee_year_of_study, " +
+                "       inv.staff_id AS invitee_staff_id, inv.staff_department AS invitee_staff_department, " +
+                "       inv.admin_id AS invitee_admin_id " +
+                "FROM invitations i " +
+                "JOIN bookings b ON i.booking_id = b.booking_id " +
+                "JOIN users u    ON b.user_id    = u.user_id " +
+                "JOIN users inv  ON i.user_id    = inv.user_id " +
+                "JOIN rooms r    ON b.room_id    = r.room_id " +
+                "WHERE i.user_id = ? " +
+                "ORDER BY b.start_time ASC");
+            ps.setString(1, userId);
+            ResultSet rs = ps.executeQuery();
+            List<Invitation> out = new ArrayList<>();
+            while (rs.next()) out.add(invitationFromRow(rs));
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch invitations by user: " + e);
         }
+    }
+
+    /**
+     * Invitations for a specific booking — used by hosts to see who responded.
+     */
+    public List<Invitation> findInvitationsByBooking(String bookingId){
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT i.status, i.invited_at, " +
+                "       b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       u.user_id   AS host_user_id,   u.user_name AS host_user_name, " +
+                "       u.user_password AS host_user_password, u.user_email AS host_user_email, " +
+                "       u.user_role AS host_user_role, " +
+                "       u.student_id AS host_student_id, u.student_major AS host_student_major, " +
+                "       u.year_of_study AS host_year_of_study, " +
+                "       u.staff_id AS host_staff_id, u.staff_department AS host_staff_department, " +
+                "       u.admin_id AS host_admin_id, " +
+                "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status, " +
+                "       inv.user_id AS invitee_user_id, inv.user_name AS invitee_user_name, " +
+                "       inv.user_password AS invitee_user_password, inv.user_email AS invitee_user_email, " +
+                "       inv.user_role AS invitee_user_role, " +
+                "       inv.student_id AS invitee_student_id, inv.student_major AS invitee_student_major, " +
+                "       inv.year_of_study AS invitee_year_of_study, " +
+                "       inv.staff_id AS invitee_staff_id, inv.staff_department AS invitee_staff_department, " +
+                "       inv.admin_id AS invitee_admin_id " +
+                "FROM invitations i " +
+                "JOIN bookings b ON i.booking_id = b.booking_id " +
+                "JOIN users u    ON b.user_id    = u.user_id " +
+                "JOIN users inv  ON i.user_id    = inv.user_id " +
+                "JOIN rooms r    ON b.room_id    = r.room_id " +
+                "WHERE i.booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            List<Invitation> out = new ArrayList<>();
+            while (rs.next()) out.add(invitationFromRow(rs));
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch invitations by booking: " + e);
+        }
+    }
+
+    /**
+     * Count of ACCEPTED invitations on a booking. The attendee count under
+     * the Outlook-style invite-only model — replaces the legacy
+     * {@link #countRsvps} reads.
+     */
+    public int countAcceptedInvitees(String bookingId){
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT COUNT(*) AS c FROM invitations " +
+                "WHERE booking_id = ? AND status = 'ACCEPTED'");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getInt("c") : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot count accepted invitees: " + e);
+        }
+    }
+
+    private Invitation invitationFromRow(ResultSet rs) throws SQLException {
+        User host = userFromAliasedRow(rs, "host_");
+        Room room = new Room(
+                rs.getInt("room_id"),
+                rs.getString("room_name"),
+                rs.getInt("capacity"),
+                AccessLevel.valueOf(rs.getString("access_level")));
+        room.setStatus(RoomStatus.valueOf(rs.getString("room_status")));
+        TimeSlot slot = new TimeSlot(
+                rs.getTimestamp("start_time").toLocalDateTime(),
+                rs.getTimestamp("end_time").toLocalDateTime());
+        BookingRequest booking = new BookingRequest(
+                rs.getString("booking_id"), host, room, slot);
+        booking.setStatus(BookingStatus.valueOf(rs.getString("booking_status")));
+
+        User invitee = userFromAliasedRow(rs, "invitee_");
+        return new Invitation(
+                booking,
+                invitee,
+                InvitationStatus.valueOf(rs.getString("status")),
+                rs.getTimestamp("invited_at").toLocalDateTime());
+    }
+
+    /**
+     * Variant of {@link #userFromRow} that reads from columns prefixed with
+     * {@code prefix}. Needed because findInvitationsByUser/Booking JOINs the
+     * users table twice (host + invitee).
+     */
+    private User userFromAliasedRow(ResultSet rs, String prefix) throws SQLException {
+        String role   = rs.getString(prefix + "user_role");
+        String userId = rs.getString(prefix + "user_id");
+        String userName = rs.getString(prefix + "user_name");
+        String password = rs.getString(prefix + "user_password");
+        String email    = rs.getString(prefix + "user_email");
+        if ("STUDENT".equals(role)) {
+            return new Student(userId, userName, password, email,
+                    rs.getString(prefix + "student_id"),
+                    rs.getString(prefix + "student_major"),
+                    rs.getInt(prefix + "year_of_study"));
+        } else if ("STAFF".equals(role)) {
+            return new Staff(userId, userName, password, email,
+                    rs.getString(prefix + "staff_id"),
+                    rs.getString(prefix + "staff_department"));
+        } else if ("ADMIN".equals(role)) {
+            Admin admin = new Admin(userId, userName, password, email,
+                    rs.getString(prefix + "admin_id"));
+            admin.setDatabaseConnector(this);
+            admin.setBookingRepository(bookingRepository);
+            return admin;
+        }
+        return null;
     }
 
     /**

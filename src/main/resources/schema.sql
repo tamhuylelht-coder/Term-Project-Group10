@@ -47,15 +47,20 @@ CREATE TABLE rsvp (
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
-CREATE TABLE invitations(
-    invitation_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+-- Outlook-style invitations. Distinct from rsvp:
+--   - rsvp        = "I self-added myself to attend this open booking"
+--   - invitations = "The host asked me; I've not yet responded / accepted / declined"
+-- The unique (booking_id, user_id) constraint stops the host from inviting the
+-- same person twice.
+CREATE TABLE invitations (
+    invitation_id INT AUTO_INCREMENT PRIMARY KEY,
     booking_id VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    invitation_status ENUM('PENDING', 'ACCEPTED', 'DECLINED') NOT NULL,
+    status ENUM('PENDING', 'ACCEPTED', 'DECLINED') NOT NULL DEFAULT 'PENDING',
     invited_at DATETIME NOT NULL,
 
-    FOREIGN KEY(booking_id) REFERENCES bookings(booking_id),
-    FOREIGN KEY(user_id) REFERENCES users(user_id)
-    UNIQUE KEY unique_invitation (booking_id, user_id);
-)
+    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    UNIQUE KEY uq_invitation (booking_id, user_id)
+);
 
