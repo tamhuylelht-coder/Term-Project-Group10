@@ -6,6 +6,7 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Admin;
+import com.vinuni.roombooking.model.Invitation;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.enums.AccessLevel;
@@ -568,6 +569,14 @@ public class DatabaseConnector {
         }
         catch(SQLException e){
             throw new IllegalStateException("Cannot make query: "+ e);
+        }
+    }
+
+    public List<Invitation> findInvitationsByUser(String userId){
+        try{
+            String query = """
+                    SELECT * FROM invitations where 
+                    """;
         }
     }
 
