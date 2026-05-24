@@ -244,7 +244,10 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
             admin.removeRoom(r.getRoomId());
             frontend.showConfirmation("Removed room " + r.getRoomId());
             refresh();
-        } catch (IllegalStateException | IllegalArgumentException | RuntimeException ex) {
+        } catch (RuntimeException ex) {
+            // Catches IllegalStateException (no DB / active bookings),
+            // IllegalArgumentException (bad roomId), and the wrapping RuntimeException
+            // from Admin.removeRoom — all subclasses, so one catch is sufficient.
             frontend.showError("Could not remove: " + ex.getMessage());
         }
     }
