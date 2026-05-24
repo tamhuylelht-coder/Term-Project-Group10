@@ -35,7 +35,7 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         HorizontalLayout nav = new HorizontalLayout(
                 styledNav(new RouterLink("Calendar", CalendarView.class)),
                 styledNav(new RouterLink("My Bookings", MyBookingsView.class)),
-                styledNav(new RouterLink("Browse", BrowseBookingsView.class))
+                styledNav(new RouterLink("Inbox", BrowseBookingsView.class))
         );
         nav.setSpacing(true);
 

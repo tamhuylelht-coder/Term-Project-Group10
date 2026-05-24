@@ -130,8 +130,11 @@ public class BookingServiceTest {
     }
 
     private void allowBaseValidation() {
-        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+        when(mockValidator.validateNotPast(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateMinimumParticipation(testRoom, 5)).thenReturn(true);
+        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
     }
 }

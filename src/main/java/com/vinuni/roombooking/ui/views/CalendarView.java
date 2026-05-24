@@ -32,9 +32,11 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.service.BookingService;
 import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.service.RoomApprovalPolicy;
+import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
+import com.vinuni.roombooking.validator.BookingValidator;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -58,8 +60,9 @@ import java.util.UUID;
  * Calendar view. Day / Week / Month modes with a left sidebar mini-month
  * and filter checkboxes. Renders the current user's hosted bookings and
  * invited meetings on a time grid, supports inspecting an event and
- * responding to invitations, and provides an in-calendar New booking dialog
- * that mirrors {@link BookingFormView}.
+ * responding to invitations, and provides an in-calendar New booking dialog.
+ * Since the legacy room-list / booking-form views were removed this is the
+ * primary (and only) entry point for creating a booking.
  *
  * Visibility rules:
  *   Hosted PENDING/APPROVED  → visible (toggled by "Hosted" checkbox)
@@ -92,6 +95,7 @@ public class CalendarView extends HorizontalLayout {
     private final BookingService service;
     private final VaadinFrontendUI frontend;
     private final RoomApprovalPolicy policy;
+    private final BookingValidator validator;
 
     private Mode mode = Mode.WEEK;
     private LocalDate anchorDate = LocalDate.now();
@@ -119,11 +123,13 @@ public class CalendarView extends HorizontalLayout {
     public CalendarView(DatabaseConnector db,
                         BookingService service,
                         VaadinFrontendUI frontend,
-                        RoomApprovalPolicy policy) {
+                        RoomApprovalPolicy policy,
+                        BookingValidator validator) {
         this.db = db;
         this.service = service;
         this.frontend = frontend;
         this.policy = policy;
+        this.validator = validator;
 
         setSizeFull();
         setSpacing(false);
@@ -1275,7 +1281,7 @@ public class CalendarView extends HorizontalLayout {
     }
 
     // -------------------------------------------------------------------------
-    // New booking dialog — mirrors BookingFormView.submit() logic.
+    // New booking dialog — the only booking-creation surface in the app.
     // -------------------------------------------------------------------------
 
     private void openNewBookingDialog() {
@@ -1289,7 +1295,10 @@ public class CalendarView extends HorizontalLayout {
         DateTimePicker startPicker = new DateTimePicker("Start");
         DateTimePicker endPicker = new DateTimePicker("End");
 
-        LocalDateTime defaultStart = selectedStart != null ? selectedStart : defaultStartTime();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime defaultStart = selectedStart != null && selectedStart.isAfter(now)
+                ? selectedStart
+                : defaultStartTime();
         LocalDateTime defaultEnd = selectedEnd != null && selectedEnd.isAfter(defaultStart)
                 ? selectedEnd
                 : defaultStart.plusHours(1);
@@ -1297,6 +1306,10 @@ public class CalendarView extends HorizontalLayout {
         endPicker.setValue(defaultEnd);
         startPicker.setStep(Duration.ofMinutes(15));
         endPicker.setStep(Duration.ofMinutes(15));
+        // Floor the pickers at "now" so the date-time UI can't pick anything in
+        // the past. Backend validateNotPast is the authoritative backstop.
+        startPicker.setMin(now);
+        endPicker.setMin(now);
         startPicker.setWidthFull();
         endPicker.setWidthFull();
 
@@ -1342,19 +1355,22 @@ public class CalendarView extends HorizontalLayout {
             int inviteeCount = (int) invitees.stream()
                     .filter(u -> u != null && !u.getUserId().equals(me.getUserId()))
                     .count();
-            int required = (int) Math.ceil(room.getCapacity() * 0.5);
-            if (inviteeCount < required) {
-                frontend.showError("Invite at least " + required + " people for a room of "
-                        + room.getCapacity() + ".");
-                return;
-            }
 
             TimeSlot slot = new TimeSlot(s, ed);
             BookingRequest req = new BookingRequest(
                     UUID.randomUUID().toString().substring(0, 8), me, room, slot);
+
+            // Run all hard validators client-side so the user gets a specific reason
+            // instead of "Booking rejected by validator". Service still runs the
+            // same checks as a defense-in-depth backstop.
+            String reason = validator.firstFailureReason(req, inviteeCount);
+            if (reason != null) { frontend.showError(reason); return; }
+
             BookingStatus status = service.submitRequest(req, inviteeCount);
             if (status == BookingStatus.REJECTED) {
-                frontend.showError("Booking rejected by validator");
+                // Service rejected after we passed the pre-check — most likely a
+                // race (someone else's conflicting booking landed first).
+                frontend.showError("Booking rejected — the room may have been booked while you were filling the form.");
                 return;
             }
 
@@ -1378,6 +1394,9 @@ public class CalendarView extends HorizontalLayout {
             refresh();
         });
         submit.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        // Enter anywhere in the dialog submits, Escape closes — standard
+        // dialog keyboard semantics that this form was missing.
+        submit.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
 
         Button cancel = new Button("Cancel", e -> dlg.close());
         dlg.getFooter().add(cancel, submit);

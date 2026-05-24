@@ -20,7 +20,7 @@ CREATE TABLE users (
 CREATE TABLE rooms (
     room_id INT PRIMARY KEY AUTO_INCREMENT,
     room_name VARCHAR(255) NOT NULL,
-    capacity INT NOT NULL,
+    capacity INT NOT NULL CHECK (capacity > 0),
     access_level ENUM('STUDENT_ONLY', 'STAFF_ONLY', 'ALL_USERS') NOT NULL,
     room_status ENUM('AVAILABLE', 'OCCUPIED', 'MAINTENANCE') NOT NULL
 );

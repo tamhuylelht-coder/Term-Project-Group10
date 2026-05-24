@@ -24,12 +24,12 @@ import java.util.List;
 /**
  * Vaadin UI entry point per the UML diagram.
  *
- * The five Phase-2 views live in {@code com.vinuni.roombooking.ui.views}:
+ * Phase-2 views live in {@code com.vinuni.roombooking.ui.views}:
  *   1. LoginView          ("")            - User.authenticate()
- *   2. RoomListView       ("rooms")       - Room.isAvailable(), Room.getAccess()
- *   3. BookingFormView    ("book")        - BookingService.submitRequest()
- *   4. MyBookingsView     ("my-bookings") - BookingRepository.findByUser(), BookingService.cancelBooking()
- *   5. AdminView          ("admin")       - Admin.* + BookingRepository.getPendingQueue()
+ *   2. CalendarView       ("calendar")    - day / week / month + New booking dialog
+ *   3. MyBookingsView     ("my-bookings") - upcoming / past tabs, cancel
+ *   4. BrowseBookingsView ("browse")      - inbox: invitation Accept / Decline
+ *   5. AdminView          ("admin")       - room CRUD, force-cancel, pending queue, users
  *
  * This class implements {@link ComponentEventListener} per the UML so cross-cutting
  * button events from any view can be routed here, and exposes the UML's

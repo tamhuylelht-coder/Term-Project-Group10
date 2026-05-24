@@ -1,9 +1,9 @@
 package com.vinuni.roombooking.repository;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.stream.Collectors;
 
@@ -13,87 +13,79 @@ import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.model.BookingRequest;
 
 /**
- * In-memory storage for BookingRequests.
- * Phase 2: Huy Tam wires real DB reads/writes into BookingService on May 15;
- * these in-memory structures serve as fallback / cache layer.
+ * In-memory cache of BookingRequests. Persistence lives in MySQL via
+ * {@link com.vinuni.roombooking.service.DatabaseConnector}; this repo is just
+ * a fast in-memory mirror that views hydrate from DB on every refresh.
  *
- * Phase 2 owner: Huy Dung
+ * <p>Backed by an LRU-evicting {@link LinkedHashMap} so a long-running JVM
+ * doesn't accumulate every booking ever made. Eviction order is insertion
+ * order — when the cap is reached, the oldest entry is dropped from both the
+ * index/history map and the pending queue.
  */
 @Repository
 public class BookingRepository {
 
-    private ArrayList<BookingRequest>       bookingHistory = new ArrayList<>();
-    private HashMap<String, BookingRequest> bookingIndex   = new HashMap<>();
-    private Queue<BookingRequest>           requestQueue   = new LinkedList<>();
+    /** Cap chosen large enough to cover all reasonable demo / single-session
+     *  workloads; if a real production deployment ever ships, this should
+     *  shrink and the repo should pull from DB on every read instead of
+     *  serving from the cache. */
+    private static final int MAX_CACHED = 5000;
 
-    /**
-     * STUB — Phase 2: add req to history, index, and queue (if PENDING).
-     */
+    /** LinkedHashMap in access-order so we evict the genuinely-least-recently-used. */
+    private final Map<String, BookingRequest> cache =
+            new LinkedHashMap<String, BookingRequest>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, BookingRequest> eldest) {
+                    if (size() > MAX_CACHED) {
+                        // Mirror eviction into the pending queue so it doesn't
+                        // hold stale references.
+                        if (eldest.getValue().getStatus() == BookingStatus.PENDING) {
+                            requestQueue.remove(eldest.getValue());
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+            };
+    private final Queue<BookingRequest> requestQueue = new LinkedList<>();
+
     public void save(BookingRequest req) {
-        BookingRequest existing = bookingIndex.get(req.getBookingId());
-        if (existing != null) {
-            bookingHistory.remove(existing);
-            if (existing.getStatus() == BookingStatus.PENDING) {
-                requestQueue.remove(existing);
-            }
+        BookingRequest existing = cache.get(req.getBookingId());
+        if (existing != null && existing.getStatus() == BookingStatus.PENDING) {
+            requestQueue.remove(existing);
         }
-
-        bookingHistory.add(req);
-        bookingIndex.put(req.getBookingId(), req);
-
+        cache.put(req.getBookingId(), req);
         if (req.getStatus() == BookingStatus.PENDING) {
             requestQueue.offer(req);
         }
     }
 
-    /**
-     * STUB — Phase 2: look up by bookingId in bookingIndex.
-     * CONTRACT (frontend must handle null): returns null if not found.
-     */
+    /** CONTRACT: returns null if not found. */
     public BookingRequest findById(String id) {
-        return bookingIndex.get(id);
+        return cache.get(id);
     }
 
-    /**
-     * CONTRACT METHOD — frontend depends on this signature from Phase 1.
-     * STUB — Phase 2: filter bookingHistory where req.getUser().getUserId().equals(userId).
-     */
     public List<BookingRequest> findByUser(String userId) {
-        return bookingHistory.stream()
+        return cache.values().stream()
                 .filter(r -> r.getUser().getUserId().equals(userId))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * CONTRACT METHOD — frontend depends on this signature from Phase 1.
-     * STUB — Phase 2: filter bookingHistory where req.getRoom().getRoomId() == roomId.
-     */
     public List<BookingRequest> findByRoom(int roomId) {
-        return bookingHistory.stream()
+        return cache.values().stream()
                 .filter(r -> r.getRoom().getRoomId() == roomId)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * STUB — Phase 2: remove from history + index; return false if not found.
-     */
     public boolean delete(String bookingId) {
-        BookingRequest req = bookingIndex.remove(bookingId);
-        if (req == null) {
-            return false;
-        }
-
-        bookingHistory.remove(req);
+        BookingRequest req = cache.remove(bookingId);
+        if (req == null) return false;
         if (req.getStatus() == BookingStatus.PENDING) {
             requestQueue.remove(req);
         }
         return true;
     }
 
-    /**
-     * CONTRACT METHOD — frontend depends on this signature from Phase 1.
-     * STUB — Phase 2: return the live requestQueue.
-     */
     public Queue<BookingRequest> getPendingQueue() {
         return requestQueue;
     }

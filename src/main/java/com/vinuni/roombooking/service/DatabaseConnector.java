@@ -22,7 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.sql.*;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
 import java.time.LocalDateTime;
@@ -245,49 +244,6 @@ public class DatabaseConnector {
     }
 
 
-    public User findUserById(String userId){
-        try{
-            PreparedStatement ps = connection.prepareStatement(
-                "SELECT * FROM users WHERE user_id = ?");
-            ps.setString(1,userId);
-            ResultSet rs =  ps.executeQuery();
-
-            if(!rs.next()){
-                return null;
-            }
-
-            String userName = rs.getString("user_name");
-            String password = rs.getString("user_password");
-            String email = rs.getString("user_email");
-            String role = rs.getString("user_role");
-            if(role.equals("STUDENT")){
-                String studentId = rs.getString("student_id");
-                String major = rs.getString("student_major");
-                int yearOfStudy = rs.getInt("year_of_study");
-
-                return new Student(userId, userName, password, email, studentId, major, yearOfStudy);
-            }
-            else if(role.equals("STAFF")){
-                String staffId = rs.getString("staff_id");
-                String department=  rs.getString("staff_department");
-
-                return new Staff(userId, userName, password, email, staffId, department);
-            }
-            else if(role.equals("ADMIN")){
-                String adminId = rs.getString("admin_id");
-                Admin admin = new Admin(userId, userName, password, email, adminId);
-                // Wire deps so AdminView's forceCancel / overrideRequest work.
-                admin.setDatabaseConnector(this);
-                admin.setBookingRepository(bookingRepository);
-                return admin;
-            }
-            else{return null;}
-        }
-        catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: "+ e);
-        }
-    }
-
 
     /**
      * Case-insensitive prefix search on user_name, used by the invitee
@@ -474,6 +430,17 @@ public class DatabaseConnector {
     }
 
     public List<BookingRequest> findAllBookings() {
+        return findBookingsWhere("");
+    }
+
+    /** Bookings whose {@code booking_status = 'PENDING'} — what AdminView needs
+     *  for the approval queue. Cheaper than {@link #findAllBookings} when the
+     *  history table grows. */
+    public List<BookingRequest> findPendingBookings() {
+        return findBookingsWhere("WHERE b.booking_status = 'PENDING'");
+    }
+
+    private List<BookingRequest> findBookingsWhere(String whereClause) {
         try {
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
@@ -483,13 +450,14 @@ public class DatabaseConnector {
                 "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status " +
                 "FROM bookings b " +
                 "JOIN users u ON b.user_id = u.user_id " +
-                "JOIN rooms r ON b.room_id = r.room_id");
+                "JOIN rooms r ON b.room_id = r.room_id " +
+                whereClause);
             ResultSet rs = ps.executeQuery();
             List<BookingRequest> out = new ArrayList<>();
             while (rs.next()) out.add(bookingFromRow(rs));
             return out;
         } catch (SQLException e) {
-            throw new IllegalStateException("Cannot fetch all bookings: " + e);
+            throw new IllegalStateException("Cannot fetch bookings: " + e);
         }
     }
 
@@ -557,141 +525,6 @@ public class DatabaseConnector {
             throw new IllegalStateException("Cannot delete room: " + e);
         }
     }
-
-    public void insertRsvp(String bookingId, String userId) {
-        try {
-            PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO rsvp (booking_id, user_id) VALUES (?, ?)");
-            ps.setString(1, bookingId);
-            ps.setString(2, userId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot insert RSVP: " + e);
-        }
-    }
-
-    public int countRsvps(String bookingId) {
-        try {
-            PreparedStatement ps = connection.prepareStatement(
-                "SELECT COUNT(*) AS c FROM rsvp WHERE booking_id = ?");
-            ps.setString(1, bookingId);
-            ResultSet rs = ps.executeQuery();
-            return rs.next() ? rs.getInt("c") : 0;
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot count RSVPs: " + e);
-        }
-    }
-
-    /**
-     * Returns true if (bookingId, userId) already exists in the rsvp table.
-     * The in-memory BookingRequest.rsvpList resets on restart, so service.addRsvp
-     * succeeds on day 2 even if the DB already has the row. This guard lets the
-     * frontend show a friendly "already RSVPed" message instead of producing a
-     * duplicate DB row.
-     */
-    public boolean hasRsvp(String bookingId, String userId) {
-        try {
-            PreparedStatement ps = connection.prepareStatement(
-                "SELECT 1 FROM rsvp WHERE booking_id = ? AND user_id = ?");
-            ps.setString(1, bookingId);
-            ps.setString(2, userId);
-            return ps.executeQuery().next();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot check RSVP: " + e);
-        }
-    }
-
-    /**
-     * Methods for managing RSVP
-     */
-    public void insertRsvp(){
-
-    }
-
-    /**
-     * Fetch RsvpList(bookingId) method: return HashSet
-     * of user name in the rsvp list
-     * @param bookingId
-     * @return
-     */
-    public HashSet<String> fetchRsvpList(String bookingId){
-        try{
-            PreparedStatement ps = connection.prepareStatement("SELECT user_id FROM rsvp WHERE booking_id = ?");
-            ps.setString(1, bookingId);
-            ResultSet rs = ps.executeQuery();
-            HashSet<String> rsvpList = new HashSet<>();
-
-            while(rs.next()){
-                String userId = rs.getString("user_id");
-                rsvpList.add(userId);
-            }
-
-            return rsvpList;
-        }
-        catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
-        }
-
-    }
-
-
-    public BookingRequest findBookingById(String bookingId){
-        try{
-            PreparedStatement ps = connection.prepareStatement("SELECT * FROM bookings where booking_id = ?");
-            ps.setString(1, bookingId);
-            ResultSet rs = ps.executeQuery();
-
-            if(!rs.next()){return null;} // No booking found
-
-            String userId = rs.getString("user_id");
-            int roomId = rs.getInt("room_id");
-            LocalDateTime startTime = rs.getTimestamp("start_time").toLocalDateTime();
-            LocalDateTime endTime = rs.getTimestamp("end_time").toLocalDateTime();
-            TimeSlot timeSlot = new TimeSlot(startTime, endTime);
-            BookingStatus bookingStatus = BookingStatus.valueOf(rs.getString("booking_status"));
-            LocalDateTime createdAt = rs.getTimestamp("created_at").toLocalDateTime();
-
-            User hostUser = findUserById(userId);
-            Room roomBooked = findRoomById(roomId);
-
-            // BookingRequest no longer caches rsvp/createdAt — the rsvp table
-            // is queried directly by countAcceptedInvitees/hasRsvp when needed.
-            BookingRequest req = new BookingRequest(bookingId, hostUser, roomBooked, timeSlot);
-            req.setStatus(bookingStatus);
-            return req;
-        }
-        catch(SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
-        }
-    }
-
-
-    public List<BookingRequest> fetchBookingsByUser(User user){
-        String userId =  user.getUserId();
-
-        try{
-            PreparedStatement ps = connection.prepareStatement("SELECT booking_id FROM bookings WHERE user_id = ?");
-            ps.setString(1, userId);
-
-            ResultSet rs = ps.executeQuery();
-
-            List<BookingRequest> bookingList = new ArrayList<>();
-
-            while(rs.next()){
-                String bookingId = rs.getString("booking_id");
-                BookingRequest req = findBookingById(bookingId);
-                bookingList.add(req);
-            }
-            return bookingList;
-        }
-        catch (SQLException e){
-            throw new IllegalStateException("Cannot make query: " + e);
-        }
-        
-    }
-    
-
-    
 
     public void insertInvitation(String bookingId, String userId){
         try{
@@ -833,8 +666,7 @@ public class DatabaseConnector {
 
     /**
      * Count of ACCEPTED invitations on a booking. The attendee count under
-     * the invite-only model — replaces the legacy
-     * {@link #countRsvps} reads.
+     * the invite-only model.
      */
     public int countAcceptedInvitees(String bookingId){
         try {

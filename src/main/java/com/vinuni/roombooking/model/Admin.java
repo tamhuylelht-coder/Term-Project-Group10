@@ -117,13 +117,9 @@ public class Admin extends User {
             }
             
             logger.info("Admin " + this.adminId + " removing room ID: " + roomId);
-            
-            // TODO (Huy Dung): Phase 2
-            // Call database connector to delete room and cascade delete cancelled bookings
-            // databaseConnector.deleteRoom(roomId);
-            
-            System.out.println("Room " + roomId + " removed successfully by admin " + this.adminId);
-            
+            databaseConnector.deleteRoom(roomId);
+            logger.info("Room " + roomId + " removed successfully by admin " + this.adminId);
+
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {

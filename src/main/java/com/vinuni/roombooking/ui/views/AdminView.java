@@ -235,11 +235,16 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void removeRoom(Room r) {
+        Admin admin = currentAdmin();
+        if (admin == null) { frontend.showError("Not an admin"); return; }
         try {
-            db.deleteRoom(r.getRoomId());
+            // Admin.removeRoom validates that no active bookings reference the room
+            // before deleting via DatabaseConnector. Going through the model rather
+            // than db.deleteRoom directly preserves that guard.
+            admin.removeRoom(r.getRoomId());
             frontend.showConfirmation("Removed room " + r.getRoomId());
             refresh();
-        } catch (IllegalStateException ex) {
+        } catch (IllegalStateException | IllegalArgumentException | RuntimeException ex) {
             frontend.showError("Could not remove: " + ex.getMessage());
         }
     }
@@ -286,9 +291,10 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private void refresh() {
         List<Room> rooms = db.findAllRooms();
         roomGrid.setItems(rooms == null ? Collections.emptyList() : rooms);
-        // Hydrate the in-memory queue from DB so pending items survive restarts.
-        List<BookingRequest> allFromDb = db.findAllBookings();
-        for (BookingRequest req : allFromDb) repository.save(req);
+        // Hydrate only the pending rows from DB — cheaper than findAllBookings()
+        // and exactly what the queue grid needs.
+        List<BookingRequest> pendingFromDb = db.findPendingBookings();
+        for (BookingRequest req : pendingFromDb) repository.save(req);
         List<BookingRequest> pending = new ArrayList<>();
         for (BookingRequest req : repository.getPendingQueue()) pending.add(req);
         pendingGrid.setItems(pending);

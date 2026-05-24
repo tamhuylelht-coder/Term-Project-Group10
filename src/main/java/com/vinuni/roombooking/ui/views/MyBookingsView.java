@@ -7,6 +7,8 @@ import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vinuni.roombooking.enums.BookingStatus;
@@ -20,12 +22,14 @@ import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 /**
- * View 4 - My bookings. Reads from BookingRepository.findByUser() and offers
- * per-row Cancel via BookingService.cancelBooking().
+ * View 4 - My bookings. Upcoming bookings (end time >= now) are in the first
+ * tab and can be cancelled. Past bookings are read-only history.
  */
 @Route(value = "my-bookings", layout = MainLayout.class)
 @PageTitle("My Bookings")
@@ -39,7 +43,13 @@ public class MyBookingsView extends VerticalLayout {
     private final VaadinFrontendUI frontend;
     private final Grid<BookingRequest> grid = new Grid<>(BookingRequest.class, false);
     private final Paragraph emptyState = new Paragraph(
-            "No bookings yet. Open Calendar and click New booking to create one.");
+            "No bookings here. Open Calendar and click New booking to create one.");
+
+    private final Tab upcomingTab = new Tab("Upcoming");
+    private final Tab pastTab = new Tab("Past");
+    private final Tabs tabs = new Tabs(upcomingTab, pastTab);
+
+    private boolean showingUpcoming = true;
 
     public MyBookingsView(BookingRepository repository,
                           BookingService service,
@@ -55,6 +65,12 @@ public class MyBookingsView extends VerticalLayout {
         H2 heading = new H2("My bookings");
         heading.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
         add(heading);
+
+        tabs.addSelectedChangeListener(e -> {
+            showingUpcoming = (e.getSelectedTab() == upcomingTab);
+            refresh();
+        });
+        add(tabs);
 
         emptyState.getStyle().set("font-size", "1.1rem");
 
@@ -81,9 +97,11 @@ public class MyBookingsView extends VerticalLayout {
         Button cancel = new Button("Cancel", e -> confirmCancel(req));
         cancel.addThemeVariants(ButtonVariant.LUMO_ERROR);
         cancel.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
-        boolean already = req.getStatus() == BookingStatus.CANCELLED
-                       || req.getStatus() == BookingStatus.REJECTED;
-        cancel.setEnabled(!already);
+        boolean alreadyClosed = req.getStatus() == BookingStatus.CANCELLED
+                             || req.getStatus() == BookingStatus.REJECTED;
+        // Cancelling a booking whose end time has passed is meaningless — disable.
+        boolean past = !req.getTimeSlot().getEndTime().isAfter(LocalDateTime.now());
+        cancel.setEnabled(!alreadyClosed && !past);
         return cancel;
     }
 
@@ -95,14 +113,30 @@ public class MyBookingsView extends VerticalLayout {
             grid.setVisible(false);
             return;
         }
-        // Hydrate the in-memory repo from DB so cancel/RSVP can find bookings
-        // that were persisted in a previous app run or by another session.
+        // Hydrate the in-memory repo from DB so cancel can find bookings that
+        // were persisted in a previous app run or by another session.
         List<BookingRequest> fromDb = db.findBookingsByUser(user.getUserId());
         for (BookingRequest req : fromDb) repository.save(req);
-        List<BookingRequest> mine = repository.findByUser(user.getUserId());
-        grid.setItems(mine);
-        emptyState.setVisible(mine.isEmpty());
-        grid.setVisible(!mine.isEmpty());
+        List<BookingRequest> all = repository.findByUser(user.getUserId());
+
+        LocalDateTime now = LocalDateTime.now();
+        List<BookingRequest> filtered = all.stream()
+                .filter(r -> showingUpcoming
+                        ? r.getTimeSlot().getEndTime().isAfter(now)
+                        : !r.getTimeSlot().getEndTime().isAfter(now))
+                .sorted(showingUpcoming
+                        ? Comparator.comparing(r -> r.getTimeSlot().getStartTime())
+                        : Comparator.<BookingRequest, LocalDateTime>comparing(
+                                r -> r.getTimeSlot().getStartTime()).reversed())
+                .toList();
+        grid.setItems(filtered);
+        if (filtered.isEmpty()) {
+            emptyState.setText(showingUpcoming
+                    ? "No upcoming bookings. Open Calendar and click New booking to create one."
+                    : "No past bookings yet.");
+        }
+        emptyState.setVisible(filtered.isEmpty());
+        grid.setVisible(!filtered.isEmpty());
     }
 
     private void confirmCancel(BookingRequest req) {
