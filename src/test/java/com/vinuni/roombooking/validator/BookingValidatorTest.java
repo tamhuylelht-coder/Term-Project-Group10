@@ -16,6 +16,7 @@ import com.vinuni.roombooking.model.Staff;
 import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.repository.BookingRepository;
 
 public class BookingValidatorTest {
 
@@ -23,7 +24,10 @@ public class BookingValidatorTest {
 
     @BeforeEach
     void setUp() {
-        validator = new BookingValidator();
+        // BookingValidator now takes a repo by constructor injection. A fresh
+        // empty in-memory repo is fine for these tests — validateOneBookingPerDay
+        // is the only path that touches it, and the tests don't pre-seed it.
+        validator = new BookingValidator(new BookingRepository());
     }
 
     @Test

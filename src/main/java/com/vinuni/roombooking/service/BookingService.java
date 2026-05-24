@@ -43,20 +43,24 @@ public class BookingService {
     /**
      * CONTRACT — Submit a booking request through validation and persist it.
      *
-     * Validators run for duration, advance window and minimum participation.
-     * Conflict is checked against the live bookings table via
-     * {@link DatabaseConnector#hasRoomConflict} (not the in-memory repo). If
-     * any hard rule fails, returns REJECTED. Otherwise the
-     * {@link RoomApprovalPolicy} decides whether the request can skip the
-     * admin queue (APPROVED) or must wait (PENDING). The user's role does
-     * not gate submission — it gates auto-approval only.
+     * Validators run for access, past-time, advance window, duration, minimum
+     * participation, and one-booking-per-day. Conflict is checked against the
+     * live bookings table via {@link DatabaseConnector#hasRoomConflict}. If any
+     * hard rule fails, returns REJECTED. Otherwise the {@link RoomApprovalPolicy}
+     * decides whether the request can skip the admin queue (APPROVED) or must
+     * wait (PENDING).
      */
     public BookingStatus submitRequest(BookingRequest req, int inviteeCount) {
-        if (!validator.validateDuration(req.getTimeSlot()))      return BookingStatus.REJECTED;
-        if (!validator.validateAdvanceWindow(req.getTimeSlot())) return BookingStatus.REJECTED;
+        // Fast-fail at submission so a Student trying to book a STAFF_ONLY room
+        // doesn't sit in the pending queue waiting to be rejected by processQueue.
+        if (!validator.validateAccess(req.getRoom(), req.getUser()))   return BookingStatus.REJECTED;
+        if (!validator.validateNotPast(req.getTimeSlot()))             return BookingStatus.REJECTED;
+        if (!validator.validateAdvanceWindow(req.getTimeSlot()))       return BookingStatus.REJECTED;
+        if (!validator.validateDuration(req.getTimeSlot()))            return BookingStatus.REJECTED;
         if (!validator.validateMinimumParticipation(req.getRoom(), inviteeCount)) {
             return BookingStatus.REJECTED;
         }
+        if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
         if (dbConnector.hasRoomConflict(req.getRoom().getRoomId(),
                 req.getTimeSlot().getStartTime(),
                 req.getTimeSlot().getEndTime())) {
@@ -101,61 +105,33 @@ public class BookingService {
         return true;
     }
 
-    /**
-     * Self-RSVP path against the legacy {@code rsvp} table.
-     *
-     * @deprecated Bookings are invite-only now (see invitations table).
-     *             No FE caller relies on this; kept for back-compat with
-     *             existing tests. Will be removed once those are migrated.
-     */
-    @Deprecated
-    public boolean addRsvp(String bookingId, User user) {
-        BookingRequest req = repository.findById(bookingId);
-        if (req == null) return false;
-        if (dbConnector.hasRsvp(bookingId, user.getUserId())) return false;
-        dbConnector.insertRsvp(bookingId, user.getUserId());
-        return true;
-    }
-
     // -------------------------------------------------------------------------
     // Internal helpers — not part of the frontend contract
     // -------------------------------------------------------------------------
 
     /**
-     * STUB — Phase 2: drain requestQueue and approve/reject each in order.
+     * Drain the pending queue and decide APPROVED / REJECTED for each.
+     * Runs the same hard validators {@link #submitRequest} uses, plus an
+     * in-memory conflict check across other queued items.
      */
     public void processQueue() {
         Queue<BookingRequest> pendingQueue = repository.getPendingQueue();
         while (!pendingQueue.isEmpty()) {
             BookingRequest req = pendingQueue.poll();
-            
-            // Run all validators
-            if (!validator.validateAccess(req.getRoom(), req.getUser())) {
-                req.setStatus(BookingStatus.REJECTED);
-                dbConnector.updateBookingStatus(req);
-            } else if (!validator.validateDuration(req.getTimeSlot())) {
-                req.setStatus(BookingStatus.REJECTED);
-                dbConnector.updateBookingStatus(req);
-            } else if (!validator.validateAdvanceWindow(req.getTimeSlot())) {
-                req.setStatus(BookingStatus.REJECTED);
-                dbConnector.updateBookingStatus(req);
-            } else if (!validator.validateOneBookingPerDay(req.getUser())) {
-                req.setStatus(BookingStatus.REJECTED);
-                dbConnector.updateBookingStatus(req);
-            } else {
-                // Check for conflicts with existing bookings for the room
-                List<BookingRequest> existingBookings = repository.findByRoom(req.getRoom().getRoomId());
-                if (validator.detectConflict(req, existingBookings)) {
-                    req.setStatus(BookingStatus.REJECTED);
-                    dbConnector.updateBookingStatus(req);
-                } else {
-                    req.setStatus(BookingStatus.APPROVED);
-                    dbConnector.updateBookingStatus(req);
-                }
-            }
-            
-            // Persist the processed request
+            req.setStatus(decideQueued(req));
+            dbConnector.updateBookingStatus(req);
             repository.save(req);
         }
+    }
+
+    private BookingStatus decideQueued(BookingRequest req) {
+        if (!validator.validateAccess(req.getRoom(), req.getUser()))   return BookingStatus.REJECTED;
+        if (!validator.validateNotPast(req.getTimeSlot()))             return BookingStatus.REJECTED;
+        if (!validator.validateAdvanceWindow(req.getTimeSlot()))       return BookingStatus.REJECTED;
+        if (!validator.validateDuration(req.getTimeSlot()))            return BookingStatus.REJECTED;
+        if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
+        List<BookingRequest> existing = repository.findByRoom(req.getRoom().getRoomId());
+        if (validator.detectConflict(req, existing))                   return BookingStatus.REJECTED;
+        return BookingStatus.APPROVED;
     }
 }

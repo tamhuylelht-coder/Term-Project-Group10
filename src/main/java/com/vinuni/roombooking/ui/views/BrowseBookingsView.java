@@ -9,32 +9,36 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.enums.InvitationStatus;
 import com.vinuni.roombooking.model.Invitation;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.service.DatabaseConnector;
+import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * View 6 - Browse view (strict invite-only).
+ * View 6 - Inbox (invite-only).
  *
  *   <b>Your invitations</b> — bookings the host invited you to.
  *   Accept / Decline buttons write to the invitations table; the booking
  *   no longer has a public self-RSVP path. PENDING sort to the top so the
  *   action items are obvious.
  *
- * The previous "Open bookings" section was removed per the invite-only
- * design decision (handoff doc §A1) — if you weren't invited, you don't
- * attend.
+ * Filters applied:
+ *   - Past invitations (end time &lt; now) are hidden.
+ *   - Invitations to CANCELLED / REJECTED bookings are hidden so the
+ *     invitee can't Accept a dead meeting.
  */
 @Route(value = "browse", layout = MainLayout.class)
-@PageTitle("Browse bookings")
+@PageTitle("Inbox")
 public class BrowseBookingsView extends VerticalLayout {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -76,6 +80,10 @@ public class BrowseBookingsView extends VerticalLayout {
                 .setHeader("Start").setAutoWidth(true);
         invitesGrid.addColumn(i -> FMT.format(i.getBooking().getTimeSlot().getEndTime()))
                 .setHeader("End").setAutoWidth(true);
+        // Show the booking-level status (PENDING / APPROVED) so the invitee can tell
+        // whether the meeting is confirmed before responding.
+        invitesGrid.addComponentColumn(i -> Badges.bookingStatus(i.getBooking().getStatus()))
+                .setHeader("Booking").setAutoWidth(true);
         invitesGrid.addColumn(i -> i.getStatus().name()).setHeader("Your status").setAutoWidth(true);
         invitesGrid.addComponentColumn(this::buildInviteActions).setHeader("").setAutoWidth(true);
         invitesGrid.setAllRowsVisible(true);
@@ -127,9 +135,16 @@ public class BrowseBookingsView extends VerticalLayout {
             invitesGrid.setVisible(false);
             return;
         }
+        LocalDateTime now = LocalDateTime.now();
         // PENDING first, then by start time — surfaces the action items.
+        // Hide invites for bookings that already ended or that the host cancelled/rejected.
         List<Invitation> invites = db.findInvitationsByUser(user.getUserId())
                 .stream()
+                .filter(i -> i.getBooking().getTimeSlot().getEndTime().isAfter(now))
+                .filter(i -> {
+                    BookingStatus bs = i.getBooking().getStatus();
+                    return bs != BookingStatus.CANCELLED && bs != BookingStatus.REJECTED;
+                })
                 .sorted((a, b) -> {
                     int byStatus = Integer.compare(rank(a.getStatus()), rank(b.getStatus()));
                     if (byStatus != 0) return byStatus;

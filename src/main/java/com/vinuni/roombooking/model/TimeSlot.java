@@ -20,35 +20,28 @@ public class TimeSlot {
         return endTime;
     }
 
-    /**
-     * STUB — Phase 2: compute (endTime - startTime) in fractional hours.
-     */
+    /** Length of the slot in fractional hours. */
     public double getDurationHours() {
-        // TODO (Huy Dung): return ChronoUnit.MINUTES.between(startTime, endTime) / 60.0;
         return java.time.Duration.between(startTime, endTime).toMinutes() / 60.0;
     }
 
-    /**
-     * STUB — Phase 2: return true if this slot overlaps with other.
-     * Two slots overlap when one starts before the other ends.
-     */
+    /** True if this slot overlaps with {@code other}. */
     public boolean overlapsWith(TimeSlot other) {
-        // TODO (Huy Dung): return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
         return startTime.isBefore(other.endTime) && other.startTime.isBefore(endTime);
     }
 
-    /**
-     * STUB — Phase 2: return true if startTime is within 7 days from now.
-     */
+    /** True if the start is within 7 days from now. Upper bound. */
     public boolean isWithinOneWeek() {
         return !startTime.isAfter(LocalDateTime.now().plusWeeks(1));
     }
 
-    /**
-     * STUB — Phase 2: return true if getDurationHours() <= 3.
-     */
+    /** True if the start is strictly in the future. Lower bound. */
+    public boolean isInFuture() {
+        return startTime.isAfter(LocalDateTime.now());
+    }
+
+    /** True if the duration is at most 3 hours. */
     public boolean isWithinMaxDuration() {
-        // TODO (Huy Dung): return getDurationHours() <= 3.0;
         return getDurationHours() <= 3.0;
     }
 }
