@@ -19,12 +19,14 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for BookingService.submitRequest() after calendar auto-approval rules.
+ * Tests for BookingService.submitRequest() and tryPromoteAfterInvitationResponse()
+ * after the invitation-gated auto-approval rules.
  */
 public class BookingServiceTest {
 
@@ -61,7 +63,29 @@ public class BookingServiceTest {
     }
 
     @Test
-    void submitRequest_NoConflictAndAutoApproval_ReturnsApprovedAndPersistsApproved() {
+    void submitRequest_AutoApproval_NoInvitees_ReturnsApproved() {
+        // Stub validators for the 0-invitee path explicitly (Mockito's default
+        // return for unmatched calls is false).
+        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+        when(mockValidator.validateNotPast(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateMinimumParticipation(testRoom, 0)).thenReturn(true);
+        when(mockValidator.validateOneBookingPerDay(testStudent, validTimeSlot)).thenReturn(true);
+        when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(true);
+
+        BookingStatus result = bookingService.submitRequest(validBookingRequest, 0);
+
+        assertEquals(BookingStatus.APPROVED, result);
+        assertEquals(BookingStatus.APPROVED, validBookingRequest.getStatus());
+        verify(mockRepository).save(validBookingRequest);
+        verify(mockDatabaseConnector).insertBooking(validBookingRequest);
+    }
+
+    @Test
+    void submitRequest_AutoApprovalButHasInvitees_StaysPending() {
         allowBaseValidation();
         when(mockDatabaseConnector.hasRoomConflict(anyInt(), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(false);
@@ -69,8 +93,9 @@ public class BookingServiceTest {
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
 
-        assertEquals(BookingStatus.APPROVED, result);
-        assertEquals(BookingStatus.APPROVED, validBookingRequest.getStatus());
+        // Auto-approve room must still wait for invitees to accept.
+        assertEquals(BookingStatus.PENDING, result);
+        assertEquals(BookingStatus.PENDING, validBookingRequest.getStatus());
         verify(mockRepository).save(validBookingRequest);
         verify(mockDatabaseConnector).insertBooking(validBookingRequest);
     }
@@ -105,6 +130,8 @@ public class BookingServiceTest {
 
     @Test
     void submitRequest_MinimumParticipationViolated_ReturnsRejectedWithoutPersisting() {
+        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+        when(mockValidator.validateNotPast(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateMinimumParticipation(testRoom, 1)).thenReturn(false);
@@ -120,6 +147,9 @@ public class BookingServiceTest {
 
     @Test
     void submitRequest_DurationViolated_ReturnsRejectedWithoutPersisting() {
+        when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
+        when(mockValidator.validateNotPast(validTimeSlot)).thenReturn(true);
+        when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateDuration(validTimeSlot)).thenReturn(false);
 
         BookingStatus result = bookingService.submitRequest(validBookingRequest, 5);
@@ -129,12 +159,61 @@ public class BookingServiceTest {
         verify(mockDatabaseConnector, never()).insertBooking(any(BookingRequest.class));
     }
 
+    @Test
+    void tryPromote_PromotesAutoApprovedRoomWhenAllInviteesAccept() {
+        validBookingRequest.setStatus(BookingStatus.PENDING);
+        when(mockRepository.findById("b1")).thenReturn(validBookingRequest);
+        when(mockDatabaseConnector.allInviteesAccepted("b1")).thenReturn(true);
+        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(true);
+
+        BookingStatus after = bookingService.tryPromoteAfterInvitationResponse("b1");
+
+        assertEquals(BookingStatus.APPROVED, after);
+        assertEquals(BookingStatus.APPROVED, validBookingRequest.getStatus());
+        verify(mockRepository).save(validBookingRequest);
+        verify(mockDatabaseConnector).updateBookingStatus(validBookingRequest);
+    }
+
+    @Test
+    void tryPromote_NonAutoRoomStaysPendingEvenWhenAllAccept() {
+        validBookingRequest.setStatus(BookingStatus.PENDING);
+        when(mockRepository.findById("b1")).thenReturn(validBookingRequest);
+        when(mockDatabaseConnector.allInviteesAccepted("b1")).thenReturn(true);
+        when(mockPolicy.canAutoApprove(testRoom, testStudent)).thenReturn(false);
+
+        BookingStatus after = bookingService.tryPromoteAfterInvitationResponse("b1");
+
+        assertEquals(BookingStatus.PENDING, after);
+        assertEquals(BookingStatus.PENDING, validBookingRequest.getStatus());
+        verify(mockRepository, never()).save(any());
+        verify(mockDatabaseConnector, never()).updateBookingStatus(any());
+    }
+
+    @Test
+    void tryPromote_StaysPendingWhenSomeInviteesStillWaiting() {
+        validBookingRequest.setStatus(BookingStatus.PENDING);
+        when(mockRepository.findById("b1")).thenReturn(validBookingRequest);
+        when(mockDatabaseConnector.allInviteesAccepted("b1")).thenReturn(false);
+
+        BookingStatus after = bookingService.tryPromoteAfterInvitationResponse("b1");
+
+        assertEquals(BookingStatus.PENDING, after);
+        verify(mockRepository, never()).save(any());
+        verify(mockPolicy, never()).canAutoApprove(any(), any());
+    }
+
+    @Test
+    void tryPromote_ReturnsNullWhenBookingNotFound() {
+        when(mockRepository.findById(anyString())).thenReturn(null);
+        assertEquals(null, bookingService.tryPromoteAfterInvitationResponse("missing"));
+    }
+
     private void allowBaseValidation() {
         when(mockValidator.validateAccess(testRoom, testStudent)).thenReturn(true);
         when(mockValidator.validateNotPast(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateAdvanceWindow(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateDuration(validTimeSlot)).thenReturn(true);
         when(mockValidator.validateMinimumParticipation(testRoom, 5)).thenReturn(true);
-        when(mockValidator.validateOneBookingPerDay(testStudent)).thenReturn(true);
+        when(mockValidator.validateOneBookingPerDay(testStudent, validTimeSlot)).thenReturn(true);
     }
 }

@@ -1,9 +1,11 @@
 package com.vinuni.roombooking.ui;
 
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -19,6 +21,8 @@ import com.vinuni.roombooking.ui.views.CalendarView;
 import com.vinuni.roombooking.ui.views.LoginView;
 import com.vinuni.roombooking.ui.views.MyBookingsView;
 
+import java.util.Locale;
+
 /**
  * Top-bar layout for all authenticated views. Redirects to LoginView when
  * no user is in {@link SessionUtil}.
@@ -26,11 +30,22 @@ import com.vinuni.roombooking.ui.views.MyBookingsView;
 public class MainLayout extends AppLayout implements BeforeEnterObserver {
 
     public MainLayout() {
+        UI ui = UI.getCurrent();
+        if (ui != null) ui.setLocale(Locale.ENGLISH);
+
+        Image logo = new Image("images/vinuni-logo.png", "VinUni Room Booking");
+        logo.setHeight("36px");
+        logo.getStyle().set("margin-left", "1rem");
+
         H2 title = new H2("VinUni Room Booking");
         title.getStyle()
-                .set("margin", "0 1.5rem")
+                .set("margin", "0 1.5rem 0 0.75rem")
                 .set("font-size", "1.5rem")
                 .set("font-weight", "600");
+
+        HorizontalLayout brand = new HorizontalLayout(logo, title);
+        brand.setAlignItems(FlexComponent.Alignment.CENTER);
+        brand.setSpacing(false);
 
         HorizontalLayout nav = new HorizontalLayout(
                 styledNav(new RouterLink("Calendar", CalendarView.class)),
@@ -39,7 +54,7 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         );
         nav.setSpacing(true);
 
-        HorizontalLayout header = new HorizontalLayout(title, nav, buildUserMenu());
+        HorizontalLayout header = new HorizontalLayout(brand, nav, buildUserMenu());
         header.setWidthFull();
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
@@ -106,6 +121,9 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
     public void beforeEnter(BeforeEnterEvent event) {
         if (!SessionUtil.isLoggedIn()) {
             event.forwardTo(LoginView.class);
+        } else {
+            UI ui = event.getUI();
+            if (ui != null) ui.setLocale(Locale.ENGLISH);
         }
     }
 }

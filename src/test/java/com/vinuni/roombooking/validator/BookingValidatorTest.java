@@ -136,7 +136,33 @@ public class BookingValidatorTest {
     @Test
     void testValidateOneBookingPerDay_NoExistingBookings() {
         User user = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
-        // Since repository is created within the method, the stub will return true for empty list
+        // Empty repo means there's no booking today, so the daily-limit check passes.
         assertTrue(validator.validateOneBookingPerDay(user));
+    }
+
+    @Test
+    void testValidateOneBookingPerDay_SlotAware_BlocksSameDateOnly() {
+        BookingRepository repo = new BookingRepository();
+        BookingValidator v = new BookingValidator(repo);
+        User user = new Student("user1", "Student", "pass", "email", "stu1", "CS", 3);
+        Room room = new Room(1, "Room A", 10, AccessLevel.ALL_USERS);
+
+        // Seed an existing booking on May 26 at 10:00.
+        TimeSlot existing = new TimeSlot(
+                LocalDateTime.of(2026, 5, 26, 10, 0),
+                LocalDateTime.of(2026, 5, 26, 11, 0));
+        repo.save(new BookingRequest("b-existing", user, room, existing));
+
+        // Another slot on May 26 → blocked.
+        TimeSlot sameDay = new TimeSlot(
+                LocalDateTime.of(2026, 5, 26, 14, 0),
+                LocalDateTime.of(2026, 5, 26, 15, 0));
+        assertFalse(v.validateOneBookingPerDay(user, sameDay));
+
+        // A slot on May 27 → allowed.
+        TimeSlot nextDay = new TimeSlot(
+                LocalDateTime.of(2026, 5, 27, 10, 0),
+                LocalDateTime.of(2026, 5, 27, 11, 0));
+        assertTrue(v.validateOneBookingPerDay(user, nextDay));
     }
 }

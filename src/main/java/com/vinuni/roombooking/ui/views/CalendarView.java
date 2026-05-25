@@ -2,6 +2,7 @@ package com.vinuni.roombooking.ui.views;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ClientCallable;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -18,11 +19,14 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.enums.InvitationStatus;
+import com.vinuni.roombooking.enums.RoomStatus;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.BookingRequest;
 import com.vinuni.roombooking.model.Invitation;
@@ -50,6 +54,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -75,15 +80,17 @@ import java.util.UUID;
 @PageTitle("Calendar")
 public class CalendarView extends HorizontalLayout {
 
-    private static final int CAL_START_HOUR = 7;
-    private static final int CAL_END_HOUR = 22;
+    private static final int CAL_START_HOUR = 0;
+    private static final int CAL_END_HOUR = 24;
     private static final int PX_PER_HOUR = 60;
     private static final double PX_PER_MIN = PX_PER_HOUR / 60.0;
+    private static final int TOTAL_MINUTES = (CAL_END_HOUR - CAL_START_HOUR) * 60;
+    private static final int TOTAL_HEIGHT_PX = (CAL_END_HOUR - CAL_START_HOUR) * PX_PER_HOUR;
 
-    private static final DateTimeFormatter FMT_TIME = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private static final DateTimeFormatter FMT_LONG_DATE = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy");
-    private static final DateTimeFormatter FMT_MONTH = DateTimeFormatter.ofPattern("MMMM yyyy");
+    private static final DateTimeFormatter FMT_TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
+    private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
+    private static final DateTimeFormatter FMT_LONG_DATE = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter FMT_MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH);
     private static final String CALENDAR_BLUE = "#2f6fbd";
     private static final String CALENDAR_BLUE_DARK = "#245aa0";
     private static final String CALENDAR_BLUE_SOFT = "rgba(47, 111, 189, 0.18)";
@@ -130,6 +137,9 @@ public class CalendarView extends HorizontalLayout {
         this.frontend = frontend;
         this.policy = policy;
         this.validator = validator;
+
+        UI ui = UI.getCurrent();
+        if (ui != null) ui.setLocale(Locale.ENGLISH);
 
         setSizeFull();
         setSpacing(false);
@@ -307,7 +317,8 @@ public class CalendarView extends HorizontalLayout {
         rangeLabel.getStyle()
                 .set("font-size", "1.25rem")
                 .set("font-weight", "600")
-                .set("margin-left", "0.5rem");
+                .set("color", "var(--lumo-header-text-color)")
+                .set("white-space", "nowrap");
 
         viewTabs.add(dayTab, weekTab, monthTab);
         viewTabs.setSelectedTab(weekTab);
@@ -320,10 +331,21 @@ public class CalendarView extends HorizontalLayout {
             refresh();
         });
 
-        Span spacer = new Span();
+        // Toolbar grouping: [primary action] · [nav group] · [centered title] · [view tabs].
+        // Wrapping each group in its own HorizontalLayout keeps the spacing
+        // intentional instead of one long row of widgets.
+        HorizontalLayout navGroup = new HorizontalLayout(todayBtn, prevBtn, nextBtn);
+        navGroup.setSpacing(true);
+        navGroup.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        toolbar.add(newBookingBtn, todayBtn, prevBtn, nextBtn, rangeLabel, spacer, viewTabs);
-        toolbar.setFlexGrow(1, spacer);
+        Span leftSpacer = new Span();
+        Span rightSpacer = new Span();
+
+        toolbar.removeAll();
+        toolbar.add(newBookingBtn, navGroup, leftSpacer, rangeLabel, rightSpacer, viewTabs);
+        toolbar.setFlexGrow(1, leftSpacer);
+        toolbar.setFlexGrow(1, rightSpacer);
+        toolbar.getStyle().set("gap", "1rem").set("padding-bottom", "0.25rem");
         return toolbar;
     }
 
@@ -459,6 +481,7 @@ public class CalendarView extends HorizontalLayout {
 
         container.add(body);
         calendarBody.add(container);
+        scrollToCurrentHour();
     }
 
     private void buildWeekBody() {
@@ -491,6 +514,25 @@ public class CalendarView extends HorizontalLayout {
 
         container.add(body);
         calendarBody.add(container);
+        scrollToCurrentHour();
+    }
+
+    /**
+     * After re-render, nudge the scrollable calendar so "now" is roughly
+     * a third of the way down. The 24-hour grid otherwise opens at midnight
+     * and forces the user to scroll through eight hours of empty space.
+     */
+    private void scrollToCurrentHour() {
+        calendarBody.getElement().executeJs("""
+                const body = this;
+                const minutes = $0;
+                requestAnimationFrame(() => {
+                  const target = Math.max(0, minutes - 180);
+                  body.scrollTop = (target / 60) * $1;
+                });
+                """,
+                LocalTime.now().getHour() * 60 + LocalTime.now().getMinute(),
+                PX_PER_HOUR);
     }
 
     private void buildMonthBody() {
@@ -624,13 +666,15 @@ public class CalendarView extends HorizontalLayout {
                 .set("width", "84px")
                 .set("flex-shrink", "0")
                 .set("box-sizing", "border-box")
-                .set("border-right", "1px solid var(--lumo-contrast-10pct)");
+                // Match the horizontal hour-line weight so the time-axis
+                // border reads as part of the same grid rather than fainter.
+                .set("border-right", "1px solid rgba(0,0,0,0.18)");
 
         int totalHours = CAL_END_HOUR - CAL_START_HOUR;
         for (int i = 0; i < totalHours; i++) {
             int h = CAL_START_HOUR + i;
             Div label = new Div();
-            label.setText(String.format("%02d:00", h));
+            label.setText(String.format(Locale.ENGLISH, "%02d:00", h));
             label.getStyle()
                     .set("height", PX_PER_HOUR + "px")
                     .set("font-size", "0.95rem")
@@ -647,58 +691,85 @@ public class CalendarView extends HorizontalLayout {
 
     private Div makeDayColumn(LocalDate day, List<CalendarEvent> allEvents) {
         Div col = new Div();
-        int totalHours = CAL_END_HOUR - CAL_START_HOUR;
-        int totalHeight = totalHours * PX_PER_HOUR;
+        // Grid lines via repeating-linear-gradient — one layer for darker hour
+        // lines (every PX_PER_HOUR), one for lighter half-hour lines. Background
+        // is set as a separate background-color so we don't blow away the
+        // gradient when highlighting the anchor day.
+        String gridImage =
+                "repeating-linear-gradient(to bottom,"
+                + " rgba(0,0,0,0.18) 0,"
+                + " rgba(0,0,0,0.18) 1px,"
+                + " transparent 1px,"
+                + " transparent " + PX_PER_HOUR + "px),"
+                + "repeating-linear-gradient(to bottom,"
+                + " rgba(0,0,0,0.08) 0,"
+                + " rgba(0,0,0,0.08) 1px,"
+                + " transparent 1px,"
+                + " transparent " + (PX_PER_HOUR / 2) + "px)";
         col.getStyle()
                 .set("flex", "1 1 0")
                 .set("position", "relative")
-                .set("border-left", "1px solid var(--lumo-contrast-10pct)")
+                // Same color as the horizontal hour lines so each day cell
+                // reads as a clean rectangle.
+                .set("border-left", "1px solid rgba(0,0,0,0.18)")
                 .set("min-width", "120px")
-                .set("height", totalHeight + "px")
+                .set("height", TOTAL_HEIGHT_PX + "px")
                 .set("box-sizing", "border-box")
                 .set("cursor", "crosshair")
                 .set("user-select", "none")
-                .set("touch-action", "none");
+                .set("touch-action", "none")
+                .set("background-image", gridImage)
+                .set("background-repeat", "repeat")
+                .set("background-position", "0 0");
+        // Use background-color (not background:) so the grid background-image stays.
         if (day.equals(anchorDate)) {
-            col.getStyle().set("background", "var(--lumo-primary-color-10pct)");
+            col.getStyle().set("background-color", "var(--lumo-primary-color-10pct)");
+        } else {
+            col.getStyle().set("background-color", "var(--lumo-base-color)");
         }
 
-        // Hour and half-hour grid lines. Half-hour is lighter so the hour band
-        // still reads as the dominant rhythm.
-        for (int i = 0; i < totalHours; i++) {
-            Div hourCell = new Div();
-            hourCell.getStyle()
-                    .set("position", "absolute")
-                    .set("left", "0")
-                    .set("right", "0")
-                    .set("top", (i * PX_PER_HOUR) + "px")
-                    .set("height", PX_PER_HOUR + "px")
-                    .set("border-top", i == 0 ? "none" : "1px solid var(--lumo-contrast-10pct)")
-                    .set("pointer-events", "none");
-            col.add(hourCell);
-
-            Div halfLine = new Div();
-            halfLine.getStyle()
-                    .set("position", "absolute")
-                    .set("left", "0")
-                    .set("right", "0")
-                    .set("top", (i * PX_PER_HOUR + PX_PER_HOUR / 2) + "px")
-                    .set("height", "0")
-                    .set("border-top", "1px dashed var(--lumo-contrast-5pct)")
-                    .set("pointer-events", "none");
-            col.add(halfLine);
+        if (day.equals(LocalDate.now())) {
+            col.add(makeNowLine());
         }
 
         Div selection = makeSelectionBlock();
         applyStoredSelection(selection, day);
         col.add(selection);
-        wireDragSelection(col, selection, day, totalHeight);
+        wireDragSelection(col, selection, day);
 
         List<EventPlacement> placements = layoutDayEvents(day, allEvents);
         for (EventPlacement p : placements) {
             col.add(makeEventBlock(p, day));
         }
         return col;
+    }
+
+    /** Red horizontal line at "now" on today's column — current-time indicator. */
+    private Div makeNowLine() {
+        LocalTime now = LocalTime.now();
+        int minutes = now.getHour() * 60 + now.getMinute();
+        double top = (minutes - CAL_START_HOUR * 60) * PX_PER_MIN;
+        Div line = new Div();
+        line.getStyle()
+                .set("position", "absolute")
+                .set("left", "0")
+                .set("right", "0")
+                .set("top", top + "px")
+                .set("height", "0")
+                .set("border-top", "2px solid #d93025")
+                .set("z-index", "4")
+                .set("pointer-events", "none");
+        Div dot = new Div();
+        dot.getStyle()
+                .set("position", "absolute")
+                .set("left", "-5px")
+                .set("top", "-5px")
+                .set("width", "10px")
+                .set("height", "10px")
+                .set("border-radius", "999px")
+                .set("background", "#d93025");
+        line.add(dot);
+        return line;
     }
 
     private Div makeMonthCell(LocalDate date, YearMonth month, List<CalendarEvent> events) {
@@ -751,7 +822,7 @@ public class CalendarView extends HorizontalLayout {
         for (int i = 0; i < show; i++) {
             CalendarEvent e = sorted.get(i);
             Div chip = new Div();
-            chip.setText(FMT_TIME.format(e.startTime) + " " + e.booking.getRoom().getRoomName());
+            chip.setText(FMT_TIME.format(e.startTime) + " " + eventTitle(e));
             chip.getStyle()
                     .set("font-size", "0.72rem")
                     .set("padding", "1px 4px")
@@ -789,7 +860,7 @@ public class CalendarView extends HorizontalLayout {
 
     private Div makeEventBlock(EventPlacement p, LocalDate day) {
         LocalDateTime dayStart = day.atTime(CAL_START_HOUR, 0);
-        LocalDateTime dayEnd = day.atTime(CAL_END_HOUR, 0);
+        LocalDateTime dayEnd = day.plusDays(1).atStartOfDay();
 
         LocalDateTime evtStart = p.event.startTime.isBefore(dayStart) ? dayStart : p.event.startTime;
         LocalDateTime evtEnd = p.event.endTime.isAfter(dayEnd) ? dayEnd : p.event.endTime;
@@ -820,8 +891,10 @@ public class CalendarView extends HorizontalLayout {
 
         applyEventStyle(block, p.event);
 
+        // Title is the dominant line; the room/time read as supporting metadata
+        // underneath.
         Div titleDiv = new Div();
-        titleDiv.setText(p.event.booking.getRoom().getRoomName());
+        titleDiv.setText(eventTitle(p.event));
         titleDiv.getStyle()
                 .set("font-weight", "600")
                 .set("white-space", "nowrap")
@@ -831,7 +904,8 @@ public class CalendarView extends HorizontalLayout {
 
         if (height >= 32) {
             Div subDiv = new Div();
-            subDiv.setText(FMT_TIME.format(p.event.startTime) + "–" + FMT_TIME.format(p.event.endTime));
+            subDiv.setText(p.event.booking.getRoom().getRoomName() + " · "
+                    + FMT_TIME.format(p.event.startTime) + "–" + FMT_TIME.format(p.event.endTime));
             subDiv.getStyle()
                     .set("font-size", "0.7rem")
                     .set("opacity", "0.9")
@@ -847,6 +921,12 @@ public class CalendarView extends HorizontalLayout {
                 """);
         block.addClickListener(e -> openEventDialog(p.event));
         return block;
+    }
+
+    private String eventTitle(CalendarEvent e) {
+        String t = e.booking.getTitle();
+        if (t != null && !t.isBlank()) return t;
+        return e.booking.getRoom().getRoomName();
     }
 
     private Div makeSelectionBlock() {
@@ -867,15 +947,20 @@ public class CalendarView extends HorizontalLayout {
         return selection;
     }
 
-    private void wireDragSelection(Div col, Div selection, LocalDate day, int totalHeight) {
+    private void wireDragSelection(Div col, Div selection, LocalDate day) {
+        // Snap on 15 minutes, fixed pixel math so the blue selection's
+        // top/bottom in pixels matches the minute values we hand back to Java.
+        // Previously we divided by rect.height, which drifted from pxPerMinute
+        // whenever the layout was slightly off — the visible box and the
+        // dialog's Start/End would then disagree.
         col.getElement().executeJs("""
                 const col = this;
                 const selection = $0;
                 const root = $1;
                 const date = $2;
-                const totalHeight = $3;
-                const totalMinutes = $4;
-                const pxPerMinute = $5;
+                const totalMinutes = $3;
+                const pxPerMinute = $4;
+                const totalHeight = totalMinutes * pxPerMinute;
 
                 if (col.__calendarDragCleanup) {
                   col.__calendarDragCleanup();
@@ -883,10 +968,13 @@ public class CalendarView extends HorizontalLayout {
 
                 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
                 const snap = minute => clamp(Math.round(minute / 15) * 15, 0, totalMinutes);
+                // Pure pixel-to-minute conversion: y = clientY - top, then y / pxPerMinute.
+                // Uses the SAME pxPerMinute as draw() and the server-side TimeSlot math
+                // so the box and the dialog can never diverge.
                 const minuteFromPointer = e => {
                   const rect = col.getBoundingClientRect();
-                  const height = rect.height || totalHeight;
-                  return snap(((e.clientY - rect.top) / height) * totalMinutes);
+                  const y = clamp(e.clientY - rect.top, 0, totalHeight);
+                  return snap(y / pxPerMinute);
                 };
                 const draw = (a, b) => {
                   let start = clamp(Math.min(a, b), 0, totalMinutes);
@@ -962,8 +1050,7 @@ public class CalendarView extends HorizontalLayout {
                 selection.getElement(),
                 getElement(),
                 day.toString(),
-                totalHeight,
-                (CAL_END_HOUR - CAL_START_HOUR) * 60,
+                TOTAL_MINUTES,
                 PX_PER_MIN);
     }
 
@@ -971,11 +1058,10 @@ public class CalendarView extends HorizontalLayout {
     public void storeDraggedSelection(String date, int startMinute, int endMinute) {
         if (date == null || date.isBlank()) return;
         LocalDate day = LocalDate.parse(date);
-        int totalMinutes = (CAL_END_HOUR - CAL_START_HOUR) * 60;
-        int start = Math.max(0, Math.min(totalMinutes, Math.min(startMinute, endMinute)));
-        int end = Math.max(0, Math.min(totalMinutes, Math.max(startMinute, endMinute)));
+        int start = Math.max(0, Math.min(TOTAL_MINUTES, Math.min(startMinute, endMinute)));
+        int end = Math.max(0, Math.min(TOTAL_MINUTES, Math.max(startMinute, endMinute)));
         if (end - start < 30) {
-            end = Math.min(totalMinutes, start + 30);
+            end = Math.min(TOTAL_MINUTES, start + 30);
             if (end - start < 30) start = Math.max(0, end - 30);
         }
         selectedStart = day.atTime(CAL_START_HOUR, 0).plusMinutes(start);
@@ -994,10 +1080,9 @@ public class CalendarView extends HorizontalLayout {
     }
 
     private void updateSelectionBlock(Div selection, int a, int b) {
-        int totalMinutes = (CAL_END_HOUR - CAL_START_HOUR) * 60;
-        int start = Math.max(0, Math.min(totalMinutes, Math.min(a, b)));
-        int end = Math.max(0, Math.min(totalMinutes, Math.max(a, b)));
-        if (end == start) end = Math.min(totalMinutes, start + 30);
+        int start = Math.max(0, Math.min(TOTAL_MINUTES, Math.min(a, b)));
+        int end = Math.max(0, Math.min(TOTAL_MINUTES, Math.max(a, b)));
+        if (end == start) end = Math.min(TOTAL_MINUTES, start + 30);
         selection.getStyle()
                 .set("display", "block")
                 .set("top", (start * PX_PER_MIN) + "px")
@@ -1007,7 +1092,7 @@ public class CalendarView extends HorizontalLayout {
     private void applyStoredSelection(Div selection, LocalDate day) {
         if (selectedStart == null || selectedEnd == null) return;
         LocalDateTime dayStart = day.atTime(CAL_START_HOUR, 0);
-        LocalDateTime dayEnd = day.atTime(CAL_END_HOUR, 0);
+        LocalDateTime dayEnd = day.plusDays(1).atStartOfDay();
         if (!selectedEnd.isAfter(dayStart) || !selectedStart.isBefore(dayEnd)) return;
         int start = (int) ChronoUnit.MINUTES.between(dayStart,
                 selectedStart.isBefore(dayStart) ? dayStart : selectedStart);
@@ -1090,7 +1175,7 @@ public class CalendarView extends HorizontalLayout {
      */
     private List<EventPlacement> layoutDayEvents(LocalDate day, List<CalendarEvent> events) {
         LocalDateTime dayStart = day.atTime(CAL_START_HOUR, 0);
-        LocalDateTime dayEnd = day.atTime(CAL_END_HOUR, 0);
+        LocalDateTime dayEnd = day.plusDays(1).atStartOfDay();
 
         List<CalendarEvent> sorted = new ArrayList<>();
         for (CalendarEvent e : events) {
@@ -1164,16 +1249,41 @@ public class CalendarView extends HorizontalLayout {
         content.setSpacing(false);
         content.setPadding(false);
 
+        String title = b.getTitle() == null || b.getTitle().isBlank()
+                ? "(Untitled booking)" : b.getTitle();
+        Span titleHeading = new Span(title);
+        titleHeading.getStyle()
+                .set("font-size", "1.2rem")
+                .set("font-weight", "700")
+                .set("display", "block")
+                .set("margin-bottom", "0.25rem");
+        content.add(titleHeading);
+        if (b.getDescription() != null && !b.getDescription().isBlank()) {
+            Div desc = new Div();
+            desc.setText(b.getDescription());
+            desc.getStyle()
+                    .set("color", "var(--lumo-secondary-text-color)")
+                    .set("margin-bottom", "0.75rem")
+                    .set("white-space", "pre-wrap");
+            content.add(desc);
+        }
+
         content.add(detailRow("ID", b.getBookingId()));
         content.add(detailRow("Room", b.getRoom().getRoomName()));
         content.add(detailRow("Start", FMT_DATETIME.format(b.getTimeSlot().getStartTime())));
         content.add(detailRow("End", FMT_DATETIME.format(b.getTimeSlot().getEndTime())));
         content.add(detailRow("Host", b.getUser().getUserName()));
-        content.add(detailRow("Status", b.getStatus().name()));
+        content.add(detailComponentRow("Status", Badges.bookingStatus(b.getStatus())));
         if (event.inviteStatus != null) {
             content.add(detailRow("Your invitation", event.inviteStatus.name()));
         }
-        content.add(detailRow("Attending", String.valueOf(db.countAcceptedInvitees(b.getBookingId()))));
+        int accepted = db.countAcceptedInvitees(b.getBookingId());
+        int total = db.countInvitations(b.getBookingId());
+        if (total > 0) {
+            content.add(detailRow("Invitees accepted", accepted + " / " + total));
+        } else {
+            content.add(detailRow("Invitees accepted", String.valueOf(accepted)));
+        }
         if (isHost) content.add(buildInviteeList(b.getBookingId()));
 
         dlg.add(content);
@@ -1224,14 +1334,19 @@ public class CalendarView extends HorizontalLayout {
     }
 
     private HorizontalLayout detailRow(String label, String value) {
+        Span valueSpan = new Span(value == null ? "" : value);
+        return detailComponentRow(label, valueSpan);
+    }
+
+    private HorizontalLayout detailComponentRow(String label, Component value) {
         Span labelSpan = new Span(label);
         labelSpan.getStyle()
                 .set("font-weight", "600")
                 .set("min-width", "130px")
                 .set("color", "var(--lumo-secondary-text-color)");
-        Span valueSpan = new Span(value);
-        HorizontalLayout row = new HorizontalLayout(labelSpan, valueSpan);
+        HorizontalLayout row = new HorizontalLayout(labelSpan, value);
         row.setSpacing(true);
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
         row.getStyle().set("padding", "0.25rem 0");
         return row;
     }
@@ -1271,9 +1386,14 @@ public class CalendarView extends HorizontalLayout {
     private void respondToInvitation(String bookingId, String userId, InvitationStatus next) {
         try {
             db.updateInvitationStatus(bookingId, userId, next);
-            frontend.showConfirmation(next == InvitationStatus.ACCEPTED
+            BookingStatus afterPromote = service.tryPromoteAfterInvitationResponse(bookingId);
+            String msg = next == InvitationStatus.ACCEPTED
                     ? "Accepted invitation to " + bookingId
-                    : "Declined invitation to " + bookingId);
+                    : "Declined invitation to " + bookingId;
+            if (afterPromote == BookingStatus.APPROVED) {
+                msg += " · booking is now approved";
+            }
+            frontend.showConfirmation(msg);
         } catch (RuntimeException ex) {
             frontend.showError("Could not update invitation: " + ex.getMessage());
         }
@@ -1290,35 +1410,59 @@ public class CalendarView extends HorizontalLayout {
 
         Dialog dlg = new Dialog();
         dlg.setHeaderTitle("New booking");
-        dlg.setWidth("520px");
+        dlg.setWidth("620px");
+
+        TextField titleField = new TextField("Title");
+        titleField.setPlaceholder("Optional — e.g. Algorithms study session");
+        titleField.setWidthFull();
+
+        TextArea descField = new TextArea("Description");
+        descField.setPlaceholder("Optional details — agenda, attendees, etc.");
+        descField.setMaxLength(2000);
+        descField.setMinHeight("72px");
+        descField.setWidthFull();
 
         DateTimePicker startPicker = new DateTimePicker("Start");
         DateTimePicker endPicker = new DateTimePicker("End");
 
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime defaultStart = selectedStart != null && selectedStart.isAfter(now)
+        // Honor the drag selection verbatim. The previous version replaced the
+        // dragged time with defaultStartTime() if it wasn't strictly after now —
+        // so a drag at 01:00–03:00 on today (current time 09:00) would silently
+        // jump to 10:00–11:00. Now we trust whatever the user dragged; the
+        // submit-time validator (and "Start must be in the future" check)
+        // surfaces past-time selections instead of hiding them.
+        LocalDateTime defaultStart = selectedStart != null
                 ? selectedStart
                 : defaultStartTime();
-        LocalDateTime defaultEnd = selectedEnd != null && selectedEnd.isAfter(defaultStart)
+        LocalDateTime defaultEnd = (selectedEnd != null && selectedEnd.isAfter(defaultStart))
                 ? selectedEnd
                 : defaultStart.plusHours(1);
         startPicker.setValue(defaultStart);
         endPicker.setValue(defaultEnd);
         startPicker.setStep(Duration.ofMinutes(15));
         endPicker.setStep(Duration.ofMinutes(15));
-        // Floor the pickers at "now" so the date-time UI can't pick anything in
-        // the past. Backend validateNotPast is the authoritative backstop.
-        startPicker.setMin(now);
-        endPicker.setMin(now);
+        // Intentionally no setMin(now): DateTimePicker coerces the displayed
+        // value silently if it's below the min, which would make the dialog
+        // show a different time than the blue selection box.
+        startPicker.setLocale(Locale.ENGLISH);
+        endPicker.setLocale(Locale.ENGLISH);
         startPicker.setWidthFull();
         endPicker.setWidthFull();
 
         ComboBox<Room> roomBox = new ComboBox<>("Room");
-        roomBox.setItems(db.findAllRooms());
+        List<Room> roomList = db.findAllRooms();
+        roomBox.setItems(query -> {
+            String filter = query.getFilter().orElse("");
+            return roomList.stream()
+                    .filter(r -> matchesRoomSearch(r, filter))
+                    .skip(query.getOffset())
+                    .limit(query.getLimit());
+        });
         roomBox.setItemLabelGenerator(Room::getRoomName);
         roomBox.setRenderer(new ComponentRenderer<Component, Room>(
                 room -> renderRoomOption(room, me, startPicker.getValue(), endPicker.getValue())));
         roomBox.setWidthFull();
+        roomBox.setHelperText("Search by name, id, access, or status");
         startPicker.addValueChangeListener(e -> refreshRoomOptions(roomBox));
         endPicker.addValueChangeListener(e -> refreshRoomOptions(roomBox));
 
@@ -1333,32 +1477,64 @@ public class CalendarView extends HorizontalLayout {
         });
         inviteePicker.setWidthFull();
 
-        VerticalLayout form = new VerticalLayout(roomBox, startPicker, endPicker, inviteePicker);
-        form.setPadding(false);
-        form.setSpacing(true);
+        // Two-column responsive form: Start/End share a row on wide dialogs;
+        // everything else spans the full width. Cleaner than the previous
+        // stacked VerticalLayout.
+        com.vaadin.flow.component.formlayout.FormLayout form =
+                new com.vaadin.flow.component.formlayout.FormLayout();
+        form.setResponsiveSteps(
+                new com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep("0", 1),
+                new com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep("420px", 2));
+        form.add(titleField, 2);
+        form.add(descField, 2);
+        form.add(roomBox, 2);
+        form.add(startPicker, 1);
+        form.add(endPicker, 1);
+        form.add(inviteePicker, 2);
+        form.getStyle().set("padding", "0.25rem 0").set("row-gap", "0.75rem");
         dlg.add(form);
 
         Button submit = new Button("Create booking", e -> {
+            String titleVal = titleField.getValue();
+            if (titleVal != null) titleVal = titleVal.trim();
+            // Title is optional — DatabaseConnector.insertBooking defaults a
+            // blank value to "Untitled booking" so the NOT NULL column is fine.
+            if (titleVal != null && titleVal.isEmpty()) titleVal = null;
+            String descVal = descField.getValue();
+            if (descVal != null) descVal = descVal.trim();
+
             Room room = roomBox.getValue();
             LocalDateTime s = startPicker.getValue();
             LocalDateTime ed = endPicker.getValue();
-            Set<User> invitees = inviteePicker.getSelectedItems();
+            Set<User> selected = inviteePicker.getSelectedItems();
 
             if (room == null) { frontend.showError("Pick a room"); return; }
             if (s == null || ed == null) { frontend.showError("Pick start and end time"); return; }
             if (!ed.isAfter(s)) { frontend.showError("End must be after start"); return; }
+            if (!s.isAfter(LocalDateTime.now())) {
+                frontend.showError("Start time must be in the future.");
+                return;
+            }
             if (!roomAvailableFor(room, s, ed)) {
                 frontend.showError("Room is occupied or unavailable for the selected time.");
                 return;
             }
 
-            int inviteeCount = (int) invitees.stream()
-                    .filter(u -> u != null && !u.getUserId().equals(me.getUserId()))
-                    .count();
+            // Dedup invitees by userId so the host can't accidentally invite
+            // the same person twice. equals/hashCode on User makes the picker's
+            // own dedup more reliable, but we belt-and-brace here.
+            LinkedHashMap<String, User> unique = new LinkedHashMap<>();
+            for (User u : selected) {
+                if (u == null) continue;
+                if (u.getUserId().equals(me.getUserId())) continue;
+                unique.putIfAbsent(u.getUserId(), u);
+            }
+            int inviteeCount = unique.size();
 
             TimeSlot slot = new TimeSlot(s, ed);
             BookingRequest req = new BookingRequest(
-                    UUID.randomUUID().toString().substring(0, 8), me, room, slot);
+                    UUID.randomUUID().toString().substring(0, 8), me, room, slot,
+                    titleVal, descVal == null || descVal.isEmpty() ? null : descVal);
 
             // Run all hard validators client-side so the user gets a specific reason
             // instead of "Booking rejected by validator". Service still runs the
@@ -1375,18 +1551,19 @@ public class CalendarView extends HorizontalLayout {
             }
 
             int invited = 0;
-            for (User invitee : invitees) {
-                if (invitee == null || invitee.getUserId().equals(me.getUserId())) continue;
+            for (User invitee : unique.values()) {
                 try {
-                    db.insertInvitation(req.getBookingId(), invitee.getUserId());
-                    invited++;
+                    if (db.insertInvitation(req.getBookingId(), invitee.getUserId())) {
+                        invited++;
+                    }
                 } catch (RuntimeException ex) {
                     frontend.showError("Could not invite " + invitee.getUserName()
                             + ": " + ex.getMessage());
                 }
             }
 
-            String msg = "Created booking " + req.getBookingId() + " (" + req.getStatus() + ")";
+            String displayTitle = (titleVal != null && !titleVal.isEmpty()) ? titleVal : "booking";
+            String msg = "Created \"" + displayTitle + "\" (" + req.getStatus() + ")";
             if (invited > 0) msg += " · " + invited + " invited";
             frontend.showConfirmation(msg);
             clearSelectedSlot();
@@ -1394,13 +1571,26 @@ public class CalendarView extends HorizontalLayout {
             refresh();
         });
         submit.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        // Enter anywhere in the dialog submits, Escape closes — standard
-        // dialog keyboard semantics that this form was missing.
-        submit.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
+        // Enter inside the title field submits, Escape closes — standard dialog
+        // keyboard semantics. We bind to the title field rather than the whole
+        // dialog so Enter inside the description TextArea adds a newline as
+        // users expect.
+        submit.addClickShortcut(com.vaadin.flow.component.Key.ENTER)
+                .listenOn(titleField);
 
         Button cancel = new Button("Cancel", e -> dlg.close());
         dlg.getFooter().add(cancel, submit);
         dlg.open();
+    }
+
+    private boolean matchesRoomSearch(Room r, String filter) {
+        if (filter == null || filter.isBlank()) return true;
+        String f = filter.trim().toLowerCase(Locale.ENGLISH);
+        if (r.getRoomName() != null && r.getRoomName().toLowerCase(Locale.ENGLISH).contains(f)) return true;
+        if (String.valueOf(r.getRoomId()).contains(f)) return true;
+        if (r.getAccess() != null && r.getAccess().name().toLowerCase(Locale.ENGLISH).contains(f)) return true;
+        if (r.getStatus() != null && r.getStatus().name().toLowerCase(Locale.ENGLISH).contains(f)) return true;
+        return false;
     }
 
     private LocalDateTime defaultStartTime() {
@@ -1410,15 +1600,10 @@ public class CalendarView extends HorizontalLayout {
     }
 
     private void refreshRoomOptions(ComboBox<Room> roomBox) {
+        // Trigger the lazy callback to re-evaluate availability badges.
         Room selected = roomBox.getValue();
-        List<Room> rooms = db.findAllRooms();
-        roomBox.setItems(rooms);
-        if (selected != null) {
-            rooms.stream()
-                    .filter(r -> r.getRoomId() == selected.getRoomId())
-                    .findFirst()
-                    .ifPresent(roomBox::setValue);
-        }
+        roomBox.getDataProvider().refreshAll();
+        if (selected != null) roomBox.setValue(selected);
     }
 
     private Component renderRoomOption(Room room, User user, LocalDateTime start, LocalDateTime end) {
@@ -1435,25 +1620,16 @@ public class CalendarView extends HorizontalLayout {
         meta.setAlignItems(FlexComponent.Alignment.CENTER);
         meta.add(new Span("Cap " + room.getCapacity()));
         meta.add(new Span(policy.displayName(policy.classify(room))));
+        meta.add(Badges.roomStatus(room.getStatus()));
         boolean available = roomAvailableFor(room, start, end);
-        meta.add(statusBadge(available ? "Available" : "Occupied", available));
+        if (room.getStatus() == RoomStatus.AVAILABLE) {
+            meta.add(Badges.bookingAvailability(available));
+        }
         meta.add(policyBadge(policy.canAutoApprove(room, user)));
         meta.getStyle().set("font-size", "0.8rem");
 
         option.add(name, meta);
         return option;
-    }
-
-    private Span statusBadge(String text, boolean good) {
-        Span badge = new Span(text);
-        badge.getStyle()
-                .set("padding", "1px 6px")
-                .set("border-radius", "999px")
-                .set("font-size", "0.75rem")
-                .set("font-weight", "600")
-                .set("background", good ? "var(--lumo-success-color-10pct)" : "var(--lumo-error-color-10pct)")
-                .set("color", good ? "var(--lumo-success-text-color)" : "var(--lumo-error-text-color)");
-        return badge;
     }
 
     private Span policyBadge(boolean autoApproved) {

@@ -211,7 +211,20 @@ public class Admin extends User {
                 throw new IllegalStateException(
                     "Request " + req.getBookingId() + " is not pending. Current status: " + req.getStatus());
             }
-            
+
+            // Approval is gated on every invitee accepting — declining or
+            // not-yet-responding blocks the host's meeting from being marked
+            // confirmed. Rejection is always allowed.
+            if (approved) {
+                int total = databaseConnector.countInvitations(req.getBookingId());
+                if (total > 0 && !databaseConnector.allInviteesAccepted(req.getBookingId())) {
+                    int accepted = databaseConnector.countAcceptedInvitees(req.getBookingId());
+                    throw new IllegalStateException(
+                        "Cannot approve " + req.getBookingId()
+                            + ": waiting for invitees (" + accepted + "/" + total + " accepted).");
+                }
+            }
+
             // Determine action and set status
             BookingStatus newStatus = approved ? BookingStatus.APPROVED : BookingStatus.REJECTED;
             String action = approved ? "APPROVED" : "REJECTED";

@@ -1,9 +1,11 @@
 package com.vinuni.roombooking.ui.views;
 
 import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -19,6 +21,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+
+import java.util.Locale;
 
 /**
  * View 1 - Login.
@@ -49,14 +53,23 @@ public class LoginView extends VerticalLayout {
         this.frontend = frontend;
         this.authenticationManager = authenticationManager;
 
+        // Lock the UI to English so DateTimeFormatters and Vaadin's date/time
+        // pickers don't pick up the user's machine locale.
+        UI ui = UI.getCurrent();
+        if (ui != null) ui.setLocale(Locale.ENGLISH);
+
         setSizeFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
         setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
         // Larger base font for everything in this view (labels, inputs, hint).
         getStyle().set("font-size", "var(--lumo-font-size-l)");
 
+        Image logo = new Image("images/vinuni-logo.png", "VinUni Room Booking");
+        logo.setWidth("260px");
+        logo.getStyle().set("margin-bottom", "1rem");
+
         H1 title = new H1("VinUni Room Booking");
-        title.getStyle().set("font-size", "3rem").set("margin-bottom", "0.25em");
+        title.getStyle().set("font-size", "2.25rem").set("margin", "0 0 0.25em 0");
         Paragraph hint = new Paragraph(
                 "Demo accounts (password \"pass\"): alice (student), bob (staff), carol (admin).");
         hint.getStyle()
@@ -89,7 +102,7 @@ public class LoginView extends VerticalLayout {
         loginBtn.addClickListener(e ->
                 attemptLogin(nameField.getValue(), pwdField.getValue()));
 
-        add(title, hint, nameField, pwdField, loginBtn);
+        add(logo, title, hint, nameField, pwdField, loginBtn);
     }
 
     private void attemptLogin(String rawName, String pwd) {
@@ -117,7 +130,10 @@ public class LoginView extends VerticalLayout {
 
             SessionUtil.setCurrentUser(user);
             frontend.showConfirmation("Welcome, " + user.getUserName());
-            getUI().ifPresent(ui -> ui.navigate("calendar"));
+            getUI().ifPresent(navUi -> {
+                navUi.setLocale(Locale.ENGLISH);
+                navUi.navigate("calendar");
+            });
         } catch (BadCredentialsException ex) {
             frontend.showError("Wrong username or password");
         } catch (AuthenticationException ex) {
