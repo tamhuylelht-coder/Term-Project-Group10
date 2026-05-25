@@ -1,5 +1,6 @@
 package com.vinuni.roombooking.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
@@ -49,6 +50,11 @@ public class BookingService {
      * hard rule fails, returns REJECTED. Otherwise the {@link RoomApprovalPolicy}
      * decides whether the request can skip the admin queue (APPROVED) or must
      * wait (PENDING).
+     *
+     * <p><b>Invitee gating:</b> bookings with invitees always start PENDING,
+     * even if the room is normally auto-approved — the booking only promotes
+     * to APPROVED once every invitee has accepted, via
+     * {@link #tryPromoteAfterInvitationResponse(String)}.
      */
     public BookingStatus submitRequest(BookingRequest req, int inviteeCount) {
         // Fast-fail at submission so a Student trying to book a STAFF_ONLY room
@@ -60,14 +66,20 @@ public class BookingService {
         if (!validator.validateMinimumParticipation(req.getRoom(), inviteeCount)) {
             return BookingStatus.REJECTED;
         }
-        if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
+        if (!validator.validateOneBookingPerDay(req.getUser(), req.getTimeSlot())) {
+            return BookingStatus.REJECTED;
+        }
         if (dbConnector.hasRoomConflict(req.getRoom().getRoomId(),
                 req.getTimeSlot().getStartTime(),
                 req.getTimeSlot().getEndTime())) {
             return BookingStatus.REJECTED;
         }
 
-        BookingStatus decided = policy.canAutoApprove(req.getRoom(), req.getUser())
+        boolean autoApprove = policy.canAutoApprove(req.getRoom(), req.getUser());
+        // Bookings with invitees must wait for them to respond, regardless of
+        // the room policy. The promotion helper flips status to APPROVED once
+        // every invitee accepts (auto rooms) or hands it to admin (non-auto).
+        BookingStatus decided = (autoApprove && inviteeCount == 0)
                 ? BookingStatus.APPROVED
                 : BookingStatus.PENDING;
         req.setStatus(decided);
@@ -105,6 +117,34 @@ public class BookingService {
         return true;
     }
 
+    /**
+     * Called after an invitee responds. If the booking is PENDING, the host
+     * was waiting on invitees, and every invitee has now accepted, the booking
+     * promotes to APPROVED — but only when the room's policy allows auto-approval.
+     * Non-auto rooms stay PENDING for admin review.
+     *
+     * <p>Returns the booking's status after the call so callers can show the
+     * appropriate confirmation, or {@code null} if the booking wasn't found.
+     */
+    public BookingStatus tryPromoteAfterInvitationResponse(String bookingId) {
+        if (bookingId == null || bookingId.isBlank()) return null;
+        BookingRequest req = repository.findById(bookingId);
+        if (req == null) {
+            // Fall back to DB so we can promote bookings that were created in
+            // a previous JVM run (in-memory repo is cold on restart).
+            req = dbConnector.findBookingById(bookingId);
+            if (req == null) return null;
+            repository.save(req);
+        }
+        if (req.getStatus() != BookingStatus.PENDING) return req.getStatus();
+        if (!dbConnector.allInviteesAccepted(bookingId)) return req.getStatus();
+        if (!policy.canAutoApprove(req.getRoom(), req.getUser())) return req.getStatus();
+        req.setStatus(BookingStatus.APPROVED);
+        repository.save(req);
+        dbConnector.updateBookingStatus(req);
+        return BookingStatus.APPROVED;
+    }
+
     // -------------------------------------------------------------------------
     // Internal helpers — not part of the frontend contract
     // -------------------------------------------------------------------------
@@ -113,25 +153,54 @@ public class BookingService {
      * Drain the pending queue and decide APPROVED / REJECTED for each.
      * Runs the same hard validators {@link #submitRequest} uses, plus an
      * in-memory conflict check across other queued items.
+     *
+     * <p>Bookings that are still waiting on invitees are skipped (left
+     * PENDING) — promoting them is the invitation-response code path's job.
+     * Skipped items are taken off the queue so we don't loop forever; the
+     * promotion helper will re-add or admins can promote manually.
      */
     public void processQueue() {
         Queue<BookingRequest> pendingQueue = repository.getPendingQueue();
-        while (!pendingQueue.isEmpty()) {
-            BookingRequest req = pendingQueue.poll();
+        // Snapshot first so we don't modify the queue while iterating.
+        List<BookingRequest> snapshot = new ArrayList<>(pendingQueue);
+        pendingQueue.clear();
+        for (BookingRequest req : snapshot) {
+            if (waitingForInvitees(req)) {
+                // Re-save keeps the booking PENDING in the cache but doesn't
+                // requeue it indefinitely — promotion is event-driven now.
+                repository.save(req);
+                continue;
+            }
             req.setStatus(decideQueued(req));
             dbConnector.updateBookingStatus(req);
             repository.save(req);
         }
     }
 
+    private boolean waitingForInvitees(BookingRequest req) {
+        int total = dbConnector.countInvitations(req.getBookingId());
+        if (total == 0) return false;
+        return !dbConnector.allInviteesAccepted(req.getBookingId());
+    }
+
     private BookingStatus decideQueued(BookingRequest req) {
+        // All checks exclude this booking's own id — the row is already
+        // persisted as PENDING, so without exclusion the same-day and
+        // room-conflict checks would match against itself and falsely reject.
+        String self = req.getBookingId();
         if (!validator.validateAccess(req.getRoom(), req.getUser()))   return BookingStatus.REJECTED;
         if (!validator.validateNotPast(req.getTimeSlot()))             return BookingStatus.REJECTED;
         if (!validator.validateAdvanceWindow(req.getTimeSlot()))       return BookingStatus.REJECTED;
         if (!validator.validateDuration(req.getTimeSlot()))            return BookingStatus.REJECTED;
-        if (!validator.validateOneBookingPerDay(req.getUser()))        return BookingStatus.REJECTED;
-        List<BookingRequest> existing = repository.findByRoom(req.getRoom().getRoomId());
-        if (validator.detectConflict(req, existing))                   return BookingStatus.REJECTED;
+        if (!validator.validateOneBookingPerDay(req.getUser(), req.getTimeSlot(), self)) {
+            return BookingStatus.REJECTED;
+        }
+        if (dbConnector.hasRoomConflict(req.getRoom().getRoomId(),
+                req.getTimeSlot().getStartTime(),
+                req.getTimeSlot().getEndTime(),
+                self)) {
+            return BookingStatus.REJECTED;
+        }
         return BookingStatus.APPROVED;
     }
 }

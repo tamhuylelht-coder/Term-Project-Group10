@@ -13,6 +13,7 @@ import com.vinuni.roombooking.enums.BookingStatus;
 import com.vinuni.roombooking.enums.InvitationStatus;
 import com.vinuni.roombooking.model.Invitation;
 import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.service.BookingService;
 import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.Badges;
 import com.vinuni.roombooking.ui.MainLayout;
@@ -22,6 +23,7 @@ import com.vinuni.roombooking.ui.VaadinFrontendUI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -41,17 +43,22 @@ import java.util.stream.Collectors;
 @PageTitle("Inbox")
 public class BrowseBookingsView extends VerticalLayout {
 
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
 
     private final DatabaseConnector db;
+    private final BookingService service;
     private final VaadinFrontendUI frontend;
 
     private final Grid<Invitation> invitesGrid = new Grid<>(Invitation.class, false);
     private final Paragraph invitesEmpty = new Paragraph(
             "No invitations waiting. When someone invites you to a booking, you'll see it here.");
 
-    public BrowseBookingsView(DatabaseConnector db, VaadinFrontendUI frontend) {
+    public BrowseBookingsView(DatabaseConnector db,
+                              BookingService service,
+                              VaadinFrontendUI frontend) {
         this.db = db;
+        this.service = service;
         this.frontend = frontend;
         setSizeFull();
         getStyle().set("font-size", "var(--lumo-font-size-l)").set("padding", "var(--lumo-space-l)");
@@ -73,7 +80,7 @@ public class BrowseBookingsView extends VerticalLayout {
     }
 
     private void buildInvitesGrid() {
-        invitesGrid.addColumn(i -> i.getBooking().getBookingId()).setHeader("Booking").setAutoWidth(true);
+        invitesGrid.addColumn(i -> displayTitle(i)).setHeader("Title").setAutoWidth(true);
         invitesGrid.addColumn(i -> i.getBooking().getUser().getUserName()).setHeader("Host").setAutoWidth(true);
         invitesGrid.addColumn(i -> i.getBooking().getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
         invitesGrid.addColumn(i -> FMT.format(i.getBooking().getTimeSlot().getStartTime()))
@@ -84,12 +91,19 @@ public class BrowseBookingsView extends VerticalLayout {
         // whether the meeting is confirmed before responding.
         invitesGrid.addComponentColumn(i -> Badges.bookingStatus(i.getBooking().getStatus()))
                 .setHeader("Booking").setAutoWidth(true);
-        invitesGrid.addColumn(i -> i.getStatus().name()).setHeader("Your status").setAutoWidth(true);
+        invitesGrid.addComponentColumn(i -> Badges.invitationStatus(i.getStatus()))
+                .setHeader("Your status").setAutoWidth(true);
         invitesGrid.addComponentColumn(this::buildInviteActions).setHeader("").setAutoWidth(true);
         invitesGrid.setAllRowsVisible(true);
         invitesGrid.getStyle()
                 .set("font-size", "1.05rem")
                 .set("--vaadin-grid-cell-padding", "1rem");
+    }
+
+    private String displayTitle(Invitation inv) {
+        String t = inv.getBooking().getTitle();
+        if (t != null && !t.isBlank()) return t;
+        return "(Untitled) " + inv.getBooking().getBookingId();
     }
 
     private HorizontalLayout buildInviteActions(Invitation inv) {
@@ -116,11 +130,16 @@ public class BrowseBookingsView extends VerticalLayout {
         User user = SessionUtil.getCurrentUser();
         if (user == null) { frontend.showError("Not logged in"); return; }
         try {
-            db.updateInvitationStatus(
-                    inv.getBooking().getBookingId(), user.getUserId(), next);
-            frontend.showConfirmation(next == InvitationStatus.ACCEPTED
-                    ? "Accepted invitation to " + inv.getBooking().getBookingId()
-                    : "Declined invitation to " + inv.getBooking().getBookingId());
+            String bookingId = inv.getBooking().getBookingId();
+            db.updateInvitationStatus(bookingId, user.getUserId(), next);
+            BookingStatus afterPromote = service.tryPromoteAfterInvitationResponse(bookingId);
+            String msg = next == InvitationStatus.ACCEPTED
+                    ? "Accepted invitation to " + bookingId
+                    : "Declined invitation to " + bookingId;
+            if (afterPromote == BookingStatus.APPROVED) {
+                msg += " · booking is now approved";
+            }
+            frontend.showConfirmation(msg);
         } catch (IllegalStateException ex) {
             frontend.showError("Could not update invitation: " + ex.getMessage());
         }

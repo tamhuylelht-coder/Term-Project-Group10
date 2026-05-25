@@ -40,4 +40,16 @@ public abstract class User {
         if (password == null || password.isEmpty()) return false;
         return password.equals(pwd);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User other)) return false;
+        return userId != null && userId.equals(other.userId);
+    }
+
+    @Override
+    public int hashCode() {
+        return userId == null ? 0 : userId.hashCode();
+    }
 }

@@ -16,6 +16,7 @@ import com.vinuni.roombooking.model.Student;
 import com.vinuni.roombooking.model.TimeSlot;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
+import com.vinuni.roombooking.service.DatabaseConnector;
 
 @Component
 public class BookingValidator {
@@ -24,9 +25,20 @@ public class BookingValidator {
      *  not a fresh empty instance. */
     private final BookingRepository repository;
 
+    /** Optional — when set, the same-day check prefers the DB so the rule
+     *  survives JVM restarts and concurrent sessions. Unit tests can wire a
+     *  validator without it and the in-memory repo is used as a fallback. */
+    private final DatabaseConnector dbConnector;
+
     @Autowired
-    public BookingValidator(BookingRepository repository) {
+    public BookingValidator(BookingRepository repository, DatabaseConnector dbConnector) {
         this.repository = repository;
+        this.dbConnector = dbConnector;
+    }
+
+    /** Constructor kept for tests that don't need the DB. */
+    public BookingValidator(BookingRepository repository) {
+        this(repository, null);
     }
 
     /** In-memory overlap predicate. Kept for {@code processQueue}; live conflict
@@ -65,15 +77,57 @@ public class BookingValidator {
         return slot.isWithinOneWeek();
     }
 
-    /** True if the user has zero bookings whose start is today.
-     *  <p>Previously this created a fresh {@code new BookingRepository()} — meaning
-     *  the in-memory cache was always empty and the check always passed. Now uses
-     *  the injected repository and filters by today's date. */
+    /**
+     * Slot-aware "one active booking per host per date" check. Compares
+     * against the slot's start date — not today — so a user can still book
+     * future days even if they already have a meeting today.
+     *
+     * <p>Prefers the DB when available so the rule survives JVM restarts
+     * and other users' sessions; otherwise falls back to the in-memory
+     * repository for unit tests.
+     */
+    public boolean validateOneBookingPerDay(User user, TimeSlot slot) {
+        return validateOneBookingPerDay(user, slot, null);
+    }
+
+    /**
+     * Variant that skips the row whose {@code booking_id == excludeBookingId}.
+     * Pass the booking's own id when re-validating a row that's already
+     * persisted (queue processing / admin approval), so it doesn't trip the
+     * daily-limit check against itself.
+     */
+    public boolean validateOneBookingPerDay(User user, TimeSlot slot, String excludeBookingId) {
+        if (user == null || slot == null) return false;
+        LocalDate target = slot.getStartTime().toLocalDate();
+        if (dbConnector != null) {
+            try {
+                return !dbConnector.hasActiveBookingOnDate(user.getUserId(), target, excludeBookingId);
+            } catch (RuntimeException ignored) {
+                // Fall through to in-memory check if the DB lookup blows up
+                // (e.g. unit-test scaffolding without a real connection).
+            }
+        }
+        return repository.findByUser(user.getUserId()).stream()
+                .filter(b -> b.getStatus() != BookingStatus.CANCELLED
+                          && b.getStatus() != BookingStatus.REJECTED)
+                .filter(b -> excludeBookingId == null
+                          || !excludeBookingId.equals(b.getBookingId()))
+                .map(b -> b.getTimeSlot().getStartTime().toLocalDate())
+                .noneMatch(target::equals);
+    }
+
+    /**
+     * Back-compat overload: checks against "today" when the caller doesn't
+     * pass a slot. Kept so existing callers and tests keep compiling.
+     *
+     * @deprecated Use {@link #validateOneBookingPerDay(User, TimeSlot)} so
+     *             the check applies to the booking's actual date.
+     */
+    @Deprecated
     public boolean validateOneBookingPerDay(User user) {
         if (user == null) return false;
         LocalDate today = LocalDate.now();
         return repository.findByUser(user.getUserId()).stream()
-                // Don't count cancelled or rejected bookings against the daily limit.
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED
                           && b.getStatus() != BookingStatus.REJECTED)
                 .map(b -> b.getTimeSlot().getStartTime().toLocalDate())
@@ -113,8 +167,9 @@ public class BookingValidator {
             return "Invite at least " + required + " people for a room of "
                     + req.getRoom().getCapacity() + ".";
         }
-        if (!validateOneBookingPerDay(req.getUser())) {
-            return "You already have a booking today.";
+        if (!validateOneBookingPerDay(req.getUser(), req.getTimeSlot())) {
+            return "You already have an active booking on "
+                    + req.getTimeSlot().getStartTime().toLocalDate() + ".";
         }
         return null;
     }

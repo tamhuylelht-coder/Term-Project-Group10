@@ -29,6 +29,8 @@ CREATE TABLE bookings (
     booking_id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     room_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
     start_time DATETIME NOT NULL,
     end_time DATETIME NOT NULL,
     booking_status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED') NOT NULL,
@@ -47,7 +49,7 @@ CREATE TABLE rsvp (
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
--- Outlook-style invitations. Distinct from rsvp:
+-- Meeting invitations. Distinct from rsvp:
 --   - rsvp        = "I self-added myself to attend this open booking"
 --   - invitations = "The host asked me; I've not yet responded / accepted / declined"
 -- The unique (booking_id, user_id) constraint stops the host from inviting the

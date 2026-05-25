@@ -344,14 +344,16 @@ public class DatabaseConnector {
 
 
     /**
-     * STUB — Phase 2 (Huy Tam): INSERT booking into bookings table.
+     * Persist a new booking. Writes title (NOT NULL — defaults to "Untitled
+     * booking" if the caller hasn't set one) and the optional description.
      */
     public void insertBooking(BookingRequest req) {
-        // TODO (Huy Tam): INSERT INTO bookings (booking_id, user_id, room_id, start_time, end_time, status)
-        // Extracting information from the booking request
         String bookingId = req.getBookingId();
         String userId = req.getUser().getUserId();
         int roomId = req.getRoom().getRoomId();
+        String title = req.getTitle();
+        if (title == null || title.isBlank()) title = "Untitled booking";
+        String description = req.getDescription();
         Timestamp startTime = Timestamp.valueOf(req.getTimeSlot().getStartTime());
         Timestamp endTime = Timestamp.valueOf(req.getTimeSlot().getEndTime());
         String status = req.getStatus().name();
@@ -359,14 +361,19 @@ public class DatabaseConnector {
 
         try{
             PreparedStatement ps = connection.prepareStatement(
-                "INSERT INTO bookings (booking_id, user_id, room_id, start_time, end_time, booking_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                "INSERT INTO bookings (booking_id, user_id, room_id, title, description, " +
+                "start_time, end_time, booking_status, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             ps.setString(1, bookingId);
             ps.setString(2, userId);
             ps.setInt(3, roomId);
-            ps.setTimestamp(4, startTime);
-            ps.setTimestamp(5, endTime);
-            ps.setString(6, status);
-            ps.setTimestamp(7, createdAt);
+            ps.setString(4, title);
+            if (description == null) ps.setNull(5, Types.LONGVARCHAR);
+            else                     ps.setString(5, description);
+            ps.setTimestamp(6, startTime);
+            ps.setTimestamp(7, endTime);
+            ps.setString(8, status);
+            ps.setTimestamp(9, createdAt);
             ps.executeUpdate();
         }
         catch(SQLException e){
@@ -410,7 +417,8 @@ public class DatabaseConnector {
     public List<BookingRequest> findBookingsByUser(String userId) {
         try {
             PreparedStatement ps = connection.prepareStatement(
-                "SELECT b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "SELECT b.booking_id, b.title, b.description, " +
+                "       b.start_time, b.end_time, b.booking_status, b.created_at, " +
                 "       u.user_id, u.user_name, u.user_password, u.user_email, u.user_role, " +
                 "       u.student_id, u.student_major, u.year_of_study, " +
                 "       u.staff_id, u.staff_department, u.admin_id, " +
@@ -433,6 +441,33 @@ public class DatabaseConnector {
         return findBookingsWhere("");
     }
 
+    /**
+     * Single-booking lookup by id. Goes to the DB so callers can recover a
+     * persisted booking after a JVM restart cleared the in-memory cache.
+     * Returns null when no row matches.
+     */
+    public BookingRequest findBookingById(String bookingId) {
+        if (bookingId == null || bookingId.isBlank()) return null;
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT b.booking_id, b.title, b.description, " +
+                "       b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       u.user_id, u.user_name, u.user_password, u.user_email, u.user_role, " +
+                "       u.student_id, u.student_major, u.year_of_study, " +
+                "       u.staff_id, u.staff_department, u.admin_id, " +
+                "       r.room_id, r.room_name, r.capacity, r.access_level, r.room_status " +
+                "FROM bookings b " +
+                "JOIN users u ON b.user_id = u.user_id " +
+                "JOIN rooms r ON b.room_id = r.room_id " +
+                "WHERE b.booking_id = ? LIMIT 1");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? bookingFromRow(rs) : null;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot fetch booking by id: " + e);
+        }
+    }
+
     /** Bookings whose {@code booking_status = 'PENDING'} — what AdminView needs
      *  for the approval queue. Cheaper than {@link #findAllBookings} when the
      *  history table grows. */
@@ -443,7 +478,8 @@ public class DatabaseConnector {
     private List<BookingRequest> findBookingsWhere(String whereClause) {
         try {
             PreparedStatement ps = connection.prepareStatement(
-                "SELECT b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "SELECT b.booking_id, b.title, b.description, " +
+                "       b.start_time, b.end_time, b.booking_status, b.created_at, " +
                 "       u.user_id, u.user_name, u.user_password, u.user_email, u.user_role, " +
                 "       u.student_id, u.student_major, u.year_of_study, " +
                 "       u.staff_id, u.staff_department, u.admin_id, " +
@@ -472,9 +508,20 @@ public class DatabaseConnector {
         TimeSlot slot = new TimeSlot(
                 rs.getTimestamp("start_time").toLocalDateTime(),
                 rs.getTimestamp("end_time").toLocalDateTime());
-        BookingRequest req = new BookingRequest(rs.getString("booking_id"), user, room, slot);
+        BookingRequest req = new BookingRequest(
+                rs.getString("booking_id"), user, room, slot,
+                safeColumn(rs, "title"),
+                safeColumn(rs, "description"));
         req.setStatus(BookingStatus.valueOf(rs.getString("booking_status")));
         return req;
+    }
+
+    /** Returns the string column if present, or null if the ResultSet
+     *  doesn't have it. Lets us hydrate optional columns without breaking
+     *  callers that fetched a narrower projection. */
+    private String safeColumn(ResultSet rs, String column) {
+        try { return rs.getString(column); }
+        catch (SQLException ignored) { return null; }
     }
 
     private User userFromRow(ResultSet rs) throws SQLException {
@@ -526,7 +573,16 @@ public class DatabaseConnector {
         }
     }
 
-    public void insertInvitation(String bookingId, String userId){
+    /**
+     * Insert an invitation row for {@code (bookingId, userId)}.
+     *
+     * @return {@code true} if a new row was inserted, {@code false} if the
+     *         (booking_id, user_id) pair already existed (duplicate). Callers
+     *         can use this to count the actual number of distinct invitees
+     *         instead of trusting the form's selected set, which may contain
+     *         duplicates from a flaky picker.
+     */
+    public boolean insertInvitation(String bookingId, String userId){
         try{
             PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO invitations (booking_id, user_id, status, invited_at) " +
@@ -534,13 +590,13 @@ public class DatabaseConnector {
             ps.setString(1, bookingId);
             ps.setString(2, userId);
             ps.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
-            ps.executeUpdate();
+            return ps.executeUpdate() > 0;
         }
         catch(SQLException e){
             // Idempotent: swallow duplicate (booking_id, user_id) errors so the
             // host can re-submit the form without breaking the batch.
             String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
-            if(msg.contains("unique") || msg.contains("duplicate")) return;
+            if(msg.contains("unique") || msg.contains("duplicate")) return false;
             throw new IllegalStateException("Cannot insert invitation: " + e);
         }
     }
@@ -568,7 +624,8 @@ public class DatabaseConnector {
         try {
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT i.status, i.invited_at, " +
-                "       b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       b.booking_id, b.title, b.description, " +
+                "       b.start_time, b.end_time, b.booking_status, b.created_at, " +
                 "       u.user_id   AS host_user_id,   u.user_name AS host_user_name, " +
                 "       u.user_password AS host_user_password, u.user_email AS host_user_email, " +
                 "       u.user_role AS host_user_role, " +
@@ -608,7 +665,8 @@ public class DatabaseConnector {
         try {
             PreparedStatement ps = connection.prepareStatement(
                 "SELECT i.status, i.invited_at, " +
-                "       b.booking_id, b.start_time, b.end_time, b.booking_status, b.created_at, " +
+                "       b.booking_id, b.title, b.description, " +
+                "       b.start_time, b.end_time, b.booking_status, b.created_at, " +
                 "       u.user_id   AS host_user_id,   u.user_name AS host_user_name, " +
                 "       u.user_password AS host_user_password, u.user_email AS host_user_email, " +
                 "       u.user_role AS host_user_role, " +
@@ -649,15 +707,32 @@ public class DatabaseConnector {
      * @return true if some live booking already covers any part of [start, end).
      */
     public boolean hasRoomConflict(int roomId, LocalDateTime start, LocalDateTime end){
+        return hasRoomConflict(roomId, start, end, null);
+    }
+
+    /**
+     * Like {@link #hasRoomConflict(int, LocalDateTime, LocalDateTime)} but
+     * skips the row whose {@code booking_id = excludeBookingId}. Useful for
+     * queue / admin re-validation, where the booking being re-evaluated is
+     * already persisted and would otherwise conflict with itself.
+     */
+    public boolean hasRoomConflict(int roomId, LocalDateTime start, LocalDateTime end,
+                                   String excludeBookingId){
         try {
-            PreparedStatement ps = connection.prepareStatement(
-                "SELECT 1 FROM bookings " +
-                "WHERE room_id = ? AND start_time < ? AND end_time > ? " +
-                "AND booking_status NOT IN ('CANCELLED', 'REJECTED') " +
-                "LIMIT 1");
+            String sql = "SELECT 1 FROM bookings " +
+                    "WHERE room_id = ? AND start_time < ? AND end_time > ? " +
+                    "AND booking_status NOT IN ('CANCELLED', 'REJECTED') ";
+            if (excludeBookingId != null && !excludeBookingId.isBlank()) {
+                sql += "AND booking_id <> ? ";
+            }
+            sql += "LIMIT 1";
+            PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1, roomId);
             ps.setTimestamp(2, Timestamp.valueOf(end));
             ps.setTimestamp(3, Timestamp.valueOf(start));
+            if (excludeBookingId != null && !excludeBookingId.isBlank()) {
+                ps.setString(4, excludeBookingId);
+            }
             return ps.executeQuery().next();
         } catch (SQLException e) {
             throw new IllegalStateException("Cannot check room conflict: " + e);
@@ -681,6 +756,83 @@ public class DatabaseConnector {
         }
     }
 
+    /** Total number of invitations on a booking, regardless of status. */
+    public int countInvitations(String bookingId){
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT COUNT(*) AS c FROM invitations WHERE booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getInt("c") : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot count invitations: " + e);
+        }
+    }
+
+    /**
+     * True if the booking has at least one invitation and every invitation has
+     * been ACCEPTED. A booking with zero invitations returns {@code false} —
+     * the "all invitees accepted" wording doesn't apply when there are no
+     * invitees, so promotion code-paths should special-case that elsewhere.
+     */
+    public boolean allInviteesAccepted(String bookingId){
+        try {
+            PreparedStatement ps = connection.prepareStatement(
+                "SELECT " +
+                "  SUM(CASE WHEN status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted, " +
+                "  COUNT(*) AS total " +
+                "FROM invitations WHERE booking_id = ?");
+            ps.setString(1, bookingId);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) return false;
+            int total = rs.getInt("total");
+            int accepted = rs.getInt("accepted");
+            return total > 0 && accepted == total;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot check invitee acceptance: " + e);
+        }
+    }
+
+    /**
+     * DB-backed "host already booked something on this date" check.
+     * Cancelled/rejected bookings are ignored so a freed slot doesn't block
+     * the user from re-booking. The comparison is on the booking's start
+     * date in the server's local time — same convention as the calendar UI.
+     */
+    public boolean hasActiveBookingOnDate(String userId, java.time.LocalDate date){
+        return hasActiveBookingOnDate(userId, date, null);
+    }
+
+    /**
+     * Same-day check with optional self-exclusion — pass the booking's own id
+     * when re-validating a row that's already in the table so it doesn't fail
+     * the daily limit against itself.
+     */
+    public boolean hasActiveBookingOnDate(String userId, java.time.LocalDate date,
+                                          String excludeBookingId){
+        try {
+            java.time.LocalDateTime dayStart = date.atStartOfDay();
+            java.time.LocalDateTime dayEnd   = date.plusDays(1).atStartOfDay();
+            String sql = "SELECT 1 FROM bookings " +
+                    "WHERE user_id = ? AND start_time >= ? AND start_time < ? " +
+                    "AND booking_status NOT IN ('CANCELLED', 'REJECTED') ";
+            if (excludeBookingId != null && !excludeBookingId.isBlank()) {
+                sql += "AND booking_id <> ? ";
+            }
+            sql += "LIMIT 1";
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setString(1, userId);
+            ps.setTimestamp(2, Timestamp.valueOf(dayStart));
+            ps.setTimestamp(3, Timestamp.valueOf(dayEnd));
+            if (excludeBookingId != null && !excludeBookingId.isBlank()) {
+                ps.setString(4, excludeBookingId);
+            }
+            return ps.executeQuery().next();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot check same-day bookings: " + e);
+        }
+    }
+
     private Invitation invitationFromRow(ResultSet rs) throws SQLException {
         User host = userFromAliasedRow(rs, "host_");
         Room room = new Room(
@@ -693,7 +845,9 @@ public class DatabaseConnector {
                 rs.getTimestamp("start_time").toLocalDateTime(),
                 rs.getTimestamp("end_time").toLocalDateTime());
         BookingRequest booking = new BookingRequest(
-                rs.getString("booking_id"), host, room, slot);
+                rs.getString("booking_id"), host, room, slot,
+                safeColumn(rs, "title"),
+                safeColumn(rs, "description"));
         booking.setStatus(BookingStatus.valueOf(rs.getString("booking_status")));
 
         User invitee = userFromAliasedRow(rs, "invitee_");

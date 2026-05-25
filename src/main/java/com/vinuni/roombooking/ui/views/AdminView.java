@@ -31,21 +31,35 @@ import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * View 5 - Admin panel. Restricted to Admin users.
- *   - Room CRUD: status toggle, add room, remove room (DatabaseConnector)
- *   - Pending queue: approve / reject (Admin.overrideRequest)
- *   - Force cancel (Admin.forceCancel)
- *   - Process queue (BookingService.processQueue)
- *   - Manage users (DatabaseConnector.findAllUsers)
+ * Admin workspace. One route, but the page swaps between sections via a
+ * dropdown rather than scrolling through every grid at once — the old
+ * single-page layout was unusable once the bookings table had real data.
  */
 @Route(value = "admin", layout = MainLayout.class)
 @PageTitle("Admin")
 public class AdminView extends VerticalLayout implements BeforeEnterObserver {
+
+    private static final DateTimeFormatter FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
+
+    private enum Section {
+        PENDING("Pending approvals"),
+        ALL_BOOKINGS("All bookings"),
+        FORCE_CANCEL("Force cancel"),
+        ROOMS("Rooms"),
+        USERS("Users");
+
+        final String label;
+        Section(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
 
     private final DatabaseConnector db;
     private final BookingRepository repository;
@@ -54,6 +68,7 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
 
     private final Grid<Room> roomGrid = new Grid<>(Room.class, false);
     private final Grid<BookingRequest> pendingGrid = new Grid<>(BookingRequest.class, false);
+    private final Grid<BookingRequest> allBookingsGrid = new Grid<>(BookingRequest.class, false);
     private final Grid<User> userGrid = new Grid<>(User.class, false);
     private final TextField cancelIdField = new TextField("Booking ID");
 
@@ -61,6 +76,9 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private final TextField newRoomName = new TextField("Room name");
     private final IntegerField newRoomCapacity = new IntegerField("Capacity");
     private final ComboBox<AccessLevel> newRoomAccess = new ComboBox<>("Access");
+
+    private final ComboBox<Section> sectionPicker = new ComboBox<>("Section");
+    private final VerticalLayout sectionBody = new VerticalLayout();
 
     public AdminView(DatabaseConnector db,
                      BookingRepository repository,
@@ -75,18 +93,91 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
 
         H2 pageTitle = new H2("Admin panel");
         pageTitle.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
-        add(pageTitle);
 
-        add(sectionHeading("Rooms"));
-        Paragraph rh = new Paragraph(
-                "Toggle status, add a new room, or remove an existing one.");
-        rh.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
-        add(rh);
+        sectionPicker.setItems(Section.values());
+        sectionPicker.setValue(Section.PENDING);
+        sectionPicker.setWidth("280px");
+        sectionPicker.setAllowCustomValue(false);
+        sectionPicker.addValueChangeListener(e -> renderSection(e.getValue()));
+        sectionPicker.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
+
+        HorizontalLayout header = new HorizontalLayout(pageTitle, sectionPicker);
+        header.setAlignItems(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.BASELINE);
+        header.setSpacing(true);
+        add(header);
+
+        sectionBody.setPadding(false);
+        sectionBody.setSpacing(true);
+        sectionBody.setSizeFull();
+        add(sectionBody);
+
         buildRoomGrid();
-        add(roomGrid);
-        add(buildAddRoomRow());
+        buildPendingGrid();
+        buildAllBookingsGrid();
+        buildUserGrid();
 
-        add(sectionHeading("Force-cancel booking"));
+        renderSection(Section.PENDING);
+    }
+
+    private H3 sectionHeading(String text) {
+        H3 h = new H3(text);
+        h.getStyle().set("font-size", "1.5rem").set("margin-top", "0");
+        return h;
+    }
+
+    private void renderSection(Section section) {
+        sectionBody.removeAll();
+        Section target = section == null ? Section.PENDING : section;
+        switch (target) {
+            case PENDING       -> renderPendingSection();
+            case ALL_BOOKINGS  -> renderAllBookingsSection();
+            case FORCE_CANCEL  -> renderForceCancelSection();
+            case ROOMS         -> renderRoomsSection();
+            case USERS         -> renderUsersSection();
+        }
+        refresh();
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        if (!(SessionUtil.getCurrentUser() instanceof Admin)) {
+            event.forwardTo("calendar");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Sections
+    // -------------------------------------------------------------------------
+
+    private void renderPendingSection() {
+        sectionBody.add(sectionHeading("Pending approvals"));
+        Paragraph ph = new Paragraph(
+                "Approve once every invitee has accepted, or reject at any time. "
+                        + "Use \"Process queue\" to auto-validate items with no invitees.");
+        ph.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        sectionBody.add(ph);
+        sectionBody.add(pendingGrid);
+        Button processAll = new Button("Process queue (auto-validate)", e -> processQueue());
+        processAll.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        processAll.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("margin-top", "0.5rem");
+        sectionBody.add(processAll);
+    }
+
+    private void renderAllBookingsSection() {
+        sectionBody.add(sectionHeading("All bookings"));
+        Paragraph p = new Paragraph(
+                "Every booking in the system, including past and cancelled ones.");
+        p.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        sectionBody.add(p);
+        sectionBody.add(allBookingsGrid);
+    }
+
+    private void renderForceCancelSection() {
+        sectionBody.add(sectionHeading("Force-cancel booking"));
+        Paragraph p = new Paragraph(
+                "Force-cancel any booking by id — bypasses the usual ownership check.");
+        p.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        sectionBody.add(p);
         cancelIdField.setPlaceholder("Booking ID");
         cancelIdField.setWidth("320px");
         cancelIdField.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
@@ -95,42 +186,30 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
         forceBtn.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
         HorizontalLayout cancelRow = new HorizontalLayout(cancelIdField, forceBtn);
         cancelRow.setSpacing(true);
-        add(cancelRow);
-
-        add(sectionHeading("Pending requests"));
-        Paragraph ph = new Paragraph(
-                "Approve or reject items individually, or process the entire queue.");
-        ph.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
-        add(ph);
-        buildPendingGrid();
-        add(pendingGrid);
-        Button processAll = new Button("Process queue (auto-validate all)", e -> processQueue());
-        processAll.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        processAll.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("margin-top", "0.5rem");
-        add(processAll);
-
-        add(sectionHeading("Manage user accounts"));
-        Paragraph uh = new Paragraph("All registered users.");
-        uh.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
-        add(uh);
-        buildUserGrid();
-        add(userGrid);
-
-        refresh();
+        sectionBody.add(cancelRow);
     }
 
-    private H3 sectionHeading(String text) {
-        H3 h = new H3(text);
-        h.getStyle().set("font-size", "1.5rem").set("margin-top", "1.5rem");
-        return h;
+    private void renderRoomsSection() {
+        sectionBody.add(sectionHeading("Rooms"));
+        Paragraph p = new Paragraph(
+                "Toggle status, add a new room, or remove an existing one.");
+        p.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        sectionBody.add(p);
+        sectionBody.add(roomGrid);
+        sectionBody.add(buildAddRoomRow());
     }
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        if (!(SessionUtil.getCurrentUser() instanceof Admin)) {
-            event.forwardTo("rooms");
-        }
+    private void renderUsersSection() {
+        sectionBody.add(sectionHeading("Manage user accounts"));
+        Paragraph p = new Paragraph("All registered users.");
+        p.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
+        sectionBody.add(p);
+        sectionBody.add(userGrid);
     }
+
+    // -------------------------------------------------------------------------
+    // Grid builders
+    // -------------------------------------------------------------------------
 
     private void buildRoomGrid() {
         roomGrid.addColumn(Room::getRoomId).setHeader("ID").setAutoWidth(true);
@@ -143,7 +222,6 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
                 .setHeader("Change to").setAutoWidth(true);
         roomGrid.addComponentColumn(this::buildRemoveButton)
                 .setHeader("Remove").setAutoWidth(true);
-        // Grow with content instead of being trapped in the parent's scroll area.
         roomGrid.setAllRowsVisible(true);
         roomGrid.getStyle()
                 .set("font-size", "1.05rem")
@@ -254,16 +332,46 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
 
     private void buildPendingGrid() {
         pendingGrid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
-        pendingGrid.addColumn(r -> r.getUser().getUserName()).setHeader("User").setAutoWidth(true);
+        pendingGrid.addColumn(this::titleOrPlaceholder).setHeader("Title").setAutoWidth(true);
+        pendingGrid.addColumn(r -> r.getUser().getUserName()).setHeader("Host").setAutoWidth(true);
         pendingGrid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
-        pendingGrid.addColumn(r -> r.getTimeSlot().getStartTime().toString())
+        pendingGrid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
                 .setHeader("Start").setAutoWidth(true);
+        pendingGrid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
+                .setHeader("End").setAutoWidth(true);
         pendingGrid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
                 .setHeader("Status").setAutoWidth(true);
+        pendingGrid.addColumn(this::invitationSummary)
+                .setHeader("Invitees").setAutoWidth(true);
         pendingGrid.addComponentColumn(this::buildOverrideButtons)
                 .setHeader("Override").setAutoWidth(true);
         pendingGrid.setAllRowsVisible(true);
         pendingGrid.getStyle()
+                .set("font-size", "1.05rem")
+                .set("--vaadin-grid-cell-padding", "1rem");
+    }
+
+    private void buildAllBookingsGrid() {
+        allBookingsGrid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
+        allBookingsGrid.addColumn(this::titleOrPlaceholder).setHeader("Title").setAutoWidth(true);
+        allBookingsGrid.addColumn(r -> r.getUser().getUserName()).setHeader("Host").setAutoWidth(true);
+        allBookingsGrid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
+        allBookingsGrid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
+                .setHeader("Start").setAutoWidth(true);
+        allBookingsGrid.addColumn(r -> FMT.format(r.getTimeSlot().getEndTime()))
+                .setHeader("End").setAutoWidth(true);
+        allBookingsGrid.addComponentColumn(r -> Badges.bookingStatus(r.getStatus()))
+                .setHeader("Status").setAutoWidth(true);
+        allBookingsGrid.addColumn(this::invitationSummary)
+                .setHeader("Invitees").setAutoWidth(true);
+        allBookingsGrid.addColumn(r -> FMT.format(r.getCreatedAt()))
+                .setHeader("Created").setAutoWidth(true);
+        // setSizeFull() left the grid blank inside the dynamic section
+        // container (no resolved height). Explicit height keeps the rows
+        // scrollable without collapsing.
+        allBookingsGrid.setWidthFull();
+        allBookingsGrid.setHeight("600px");
+        allBookingsGrid.getStyle()
                 .set("font-size", "1.05rem")
                 .set("--vaadin-grid-cell-padding", "1rem");
     }
@@ -279,28 +387,61 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
                 .set("--vaadin-grid-cell-padding", "1rem");
     }
 
+    private String titleOrPlaceholder(BookingRequest r) {
+        String t = r.getTitle();
+        return t == null || t.isBlank() ? "(Untitled)" : t;
+    }
+
+    private String invitationSummary(BookingRequest r) {
+        int total = db.countInvitations(r.getBookingId());
+        if (total == 0) return "No invitees";
+        int accepted = db.countAcceptedInvitees(r.getBookingId());
+        return accepted + " / " + total + " accepted";
+    }
+
     private HorizontalLayout buildOverrideButtons(BookingRequest r) {
+        boolean blockedByInvitees = isWaitingForInvitees(r);
         Button approve = new Button("Approve", e -> override(r, BookingStatus.APPROVED));
         approve.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
         approve.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
+        // Approval is gated until every invitee has accepted.
+        approve.setEnabled(!blockedByInvitees);
+        if (blockedByInvitees) {
+            approve.getElement().setProperty("title",
+                    "Waiting for invitees: " + invitationSummary(r));
+        }
+
         Button reject = new Button("Reject", e -> override(r, BookingStatus.REJECTED));
         reject.addThemeVariants(ButtonVariant.LUMO_ERROR);
         reject.getStyle().set("--lumo-size-m", "var(--lumo-size-l)").set("font-weight", "500");
+
         HorizontalLayout row = new HorizontalLayout(approve, reject);
         row.setSpacing(true);
         return row;
     }
 
+    private boolean isWaitingForInvitees(BookingRequest r) {
+        int total = db.countInvitations(r.getBookingId());
+        if (total == 0) return false;
+        return !db.allInviteesAccepted(r.getBookingId());
+    }
+
     private void refresh() {
         List<Room> rooms = db.findAllRooms();
         roomGrid.setItems(rooms == null ? Collections.emptyList() : rooms);
-        // Hydrate only the pending rows from DB — cheaper than findAllBookings()
-        // and exactly what the queue grid needs.
+
+        // Pull pending rows from DB directly — the cached repo can lag if other
+        // sessions have written, and the gating UI needs to read live counts.
         List<BookingRequest> pendingFromDb = db.findPendingBookings();
         for (BookingRequest req : pendingFromDb) repository.save(req);
-        List<BookingRequest> pending = new ArrayList<>();
-        for (BookingRequest req : repository.getPendingQueue()) pending.add(req);
-        pendingGrid.setItems(pending);
+        pendingGrid.setItems(pendingFromDb);
+
+        List<BookingRequest> all = db.findAllBookings();
+        if (all == null) all = Collections.emptyList();
+        all = new ArrayList<>(all);
+        all.sort((a, b) -> b.getTimeSlot().getStartTime().compareTo(a.getTimeSlot().getStartTime()));
+        allBookingsGrid.setItems(all);
+
         List<User> users = db.findAllUsers();
         userGrid.setItems(users == null ? Collections.emptyList() : users);
     }

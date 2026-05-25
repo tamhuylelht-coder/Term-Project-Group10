@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * View 4 - My bookings. Upcoming bookings (end time >= now) are in the first
@@ -35,7 +36,8 @@ import java.util.List;
 @PageTitle("My Bookings")
 public class MyBookingsView extends VerticalLayout {
 
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
 
     private final BookingRepository repository;
     private final BookingService service;
@@ -75,6 +77,10 @@ public class MyBookingsView extends VerticalLayout {
         emptyState.getStyle().set("font-size", "1.1rem");
 
         grid.addColumn(BookingRequest::getBookingId).setHeader("ID").setAutoWidth(true);
+        grid.addColumn(r -> {
+            String t = r.getTitle();
+            return t == null || t.isBlank() ? "(Untitled)" : t;
+        }).setHeader("Title").setAutoWidth(true);
         grid.addColumn(r -> r.getRoom().getRoomName()).setHeader("Room").setAutoWidth(true);
         grid.addColumn(r -> FMT.format(r.getTimeSlot().getStartTime()))
                 .setHeader("Start").setAutoWidth(true);
