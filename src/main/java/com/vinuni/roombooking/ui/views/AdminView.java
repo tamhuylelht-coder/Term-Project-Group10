@@ -15,6 +15,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.enums.BookingStatus;
@@ -50,15 +51,22 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
 
     private enum Section {
-        PENDING("Pending approvals"),
-        ALL_BOOKINGS("All bookings"),
-        FORCE_CANCEL("Force cancel"),
-        ROOMS("Rooms"),
-        USERS("Users");
+        PENDING("Pending approvals", "pending"),
+        ALL_BOOKINGS("All bookings", "all-bookings"),
+        FORCE_CANCEL("Force cancel", "force-cancel"),
+        ROOMS("Rooms", "rooms"),
+        USERS("Users", "users");
 
         final String label;
-        Section(String label) { this.label = label; }
+        final String slug;
+        Section(String label, String slug) { this.label = label; this.slug = slug; }
         @Override public String toString() { return label; }
+
+        static Section fromSlug(String s) {
+            if (s == null) return null;
+            for (Section sec : values()) if (sec.slug.equalsIgnoreCase(s)) return sec;
+            return null;
+        }
     }
 
     private final DatabaseConnector db;
@@ -77,7 +85,9 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private final IntegerField newRoomCapacity = new IntegerField("Capacity");
     private final ComboBox<AccessLevel> newRoomAccess = new ComboBox<>("Access");
 
-    private final ComboBox<Section> sectionPicker = new ComboBox<>("Section");
+    // Current section is driven by the Admin dropdown in the top nav, which
+    // navigates to /admin?section=… and is read in beforeEnter().
+    private Section currentSection = Section.PENDING;
     private final VerticalLayout sectionBody = new VerticalLayout();
 
     public AdminView(DatabaseConnector db,
@@ -93,18 +103,7 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
 
         H2 pageTitle = new H2("Admin panel");
         pageTitle.getStyle().set("font-size", "2.25rem").set("margin-bottom", "0.5em");
-
-        sectionPicker.setItems(Section.values());
-        sectionPicker.setValue(Section.PENDING);
-        sectionPicker.setWidth("280px");
-        sectionPicker.setAllowCustomValue(false);
-        sectionPicker.addValueChangeListener(e -> renderSection(e.getValue()));
-        sectionPicker.getStyle().set("--lumo-size-m", "var(--lumo-size-l)");
-
-        HorizontalLayout header = new HorizontalLayout(pageTitle, sectionPicker);
-        header.setAlignItems(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.BASELINE);
-        header.setSpacing(true);
-        add(header);
+        add(pageTitle);
 
         sectionBody.setPadding(false);
         sectionBody.setSpacing(true);
@@ -128,6 +127,7 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private void renderSection(Section section) {
         sectionBody.removeAll();
         Section target = section == null ? Section.PENDING : section;
+        currentSection = target;
         switch (target) {
             case PENDING       -> renderPendingSection();
             case ALL_BOOKINGS  -> renderAllBookingsSection();
@@ -142,6 +142,18 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     public void beforeEnter(BeforeEnterEvent event) {
         if (!(SessionUtil.getCurrentUser() instanceof Admin)) {
             event.forwardTo("calendar");
+            return;
+        }
+        // /admin?section=rooms (and the rest) lets the top-nav dropdown deep-link
+        // straight into a section. Without a param we keep whatever section was
+        // last shown (or the default PENDING set in the constructor).
+        QueryParameters qp = event.getLocation().getQueryParameters();
+        List<String> values = qp.getParameters().get("section");
+        if (values != null && !values.isEmpty()) {
+            Section target = Section.fromSlug(values.get(0));
+            if (target != null && target != currentSection) {
+                renderSection(target);
+            }
         }
     }
 
@@ -192,11 +204,13 @@ public class AdminView extends VerticalLayout implements BeforeEnterObserver {
     private void renderRoomsSection() {
         sectionBody.add(sectionHeading("Rooms"));
         Paragraph p = new Paragraph(
-                "Toggle status, add a new room, or remove an existing one.");
+                "Add a new room with the form below, then manage existing rooms in the grid.");
         p.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "1.1rem");
         sectionBody.add(p);
-        sectionBody.add(roomGrid);
+        // Add-room form goes first so admins don't have to scroll past the grid
+        // every time they want to create a room.
         sectionBody.add(buildAddRoomRow());
+        sectionBody.add(roomGrid);
     }
 
     private void renderUsersSection() {
