@@ -1620,10 +1620,11 @@ public class CalendarView extends HorizontalLayout {
         meta.setAlignItems(FlexComponent.Alignment.CENTER);
         meta.add(new Span("Cap " + room.getCapacity()));
         meta.add(new Span(policy.displayName(policy.classify(room))));
-        meta.add(Badges.roomStatus(room.getStatus()));
         boolean available = roomAvailableFor(room, start, end);
         if (room.getStatus() == RoomStatus.AVAILABLE) {
             meta.add(Badges.bookingAvailability(available));
+        } else {
+            meta.add(Badges.roomStatus(room.getStatus()));
         }
         meta.add(policyBadge(policy.canAutoApprove(room, user)));
         meta.getStyle().set("font-size", "0.8rem");
