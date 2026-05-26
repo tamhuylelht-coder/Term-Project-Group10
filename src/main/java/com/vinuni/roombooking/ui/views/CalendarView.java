@@ -91,9 +91,16 @@ public class CalendarView extends HorizontalLayout {
     private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
     private static final DateTimeFormatter FMT_LONG_DATE = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
     private static final DateTimeFormatter FMT_MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH);
+    // Calendar tiles follow the Badges color contract: APPROVED/ACCEPTED → green,
+    // PENDING → orange. Drag-selection keeps a neutral blue so it doesn't read
+    // as a confirmed event.
+    private static final String STATUS_GREEN_BG = "hsl(145, 55%, 40%)";
+    private static final String STATUS_GREEN_BORDER = "hsl(145, 60%, 28%)";
+    private static final String STATUS_ORANGE_BG = "hsl(28, 88%, 55%)";
+    private static final String STATUS_ORANGE_BORDER = "hsl(28, 85%, 40%)";
+    private static final String STATUS_ORANGE_SOFT_BG = "hsl(28, 100%, 94%)";
+    private static final String STATUS_ORANGE_SOFT_FG = "hsl(28, 80%, 30%)";
     private static final String CALENDAR_BLUE = "#2f6fbd";
-    private static final String CALENDAR_BLUE_DARK = "#245aa0";
-    private static final String CALENDAR_BLUE_SOFT = "rgba(47, 111, 189, 0.18)";
     private static final String CALENDAR_BLUE_SELECTION = "rgba(47, 111, 189, 0.82)";
 
     private enum Mode { DAY, WEEK, MONTH }
@@ -1104,28 +1111,31 @@ public class CalendarView extends HorizontalLayout {
     private void applyEventStyle(Div block, CalendarEvent event) {
         if (event.isHost) {
             if (event.booking.getStatus() == BookingStatus.PENDING) {
-                // Hosted, awaiting admin approval — orange to match Badges convention.
+                // Hosted, awaiting admin approval — solid orange.
                 block.getStyle()
-                        .set("background", "hsl(28, 88%, 55%)")
+                        .set("background", STATUS_ORANGE_BG)
+                        .set("border", "1px solid " + STATUS_ORANGE_BORDER)
                         .set("color", "white");
             } else {
+                // Hosted APPROVED — solid green.
                 block.getStyle()
-                        .set("background", CALENDAR_BLUE)
-                        .set("border", "1px solid " + CALENDAR_BLUE_DARK)
+                        .set("background", STATUS_GREEN_BG)
+                        .set("border", "1px solid " + STATUS_GREEN_BORDER)
                         .set("color", "white");
             }
         } else {
             if (event.inviteStatus == InvitationStatus.ACCEPTED) {
+                // Invitation accepted — solid green.
                 block.getStyle()
-                        .set("background", CALENDAR_BLUE)
-                        .set("border", "1px solid " + CALENDAR_BLUE_DARK)
+                        .set("background", STATUS_GREEN_BG)
+                        .set("border", "1px solid " + STATUS_GREEN_BORDER)
                         .set("color", "white");
             } else {
-                // PENDING — outlined / dashed so it reads as "needs attention".
+                // PENDING invitation — outlined orange so it reads as "needs attention".
                 block.getStyle()
-                        .set("background", CALENDAR_BLUE_SOFT)
-                        .set("color", CALENDAR_BLUE_DARK)
-                        .set("border", "2px dashed " + CALENDAR_BLUE);
+                        .set("background", STATUS_ORANGE_SOFT_BG)
+                        .set("color", STATUS_ORANGE_SOFT_FG)
+                        .set("border", "2px dashed " + STATUS_ORANGE_BG);
             }
         }
     }
@@ -1620,10 +1630,11 @@ public class CalendarView extends HorizontalLayout {
         meta.setAlignItems(FlexComponent.Alignment.CENTER);
         meta.add(new Span("Cap " + room.getCapacity()));
         meta.add(new Span(policy.displayName(policy.classify(room))));
-        meta.add(Badges.roomStatus(room.getStatus()));
         boolean available = roomAvailableFor(room, start, end);
         if (room.getStatus() == RoomStatus.AVAILABLE) {
             meta.add(Badges.bookingAvailability(available));
+        } else {
+            meta.add(Badges.roomStatus(room.getStatus()));
         }
         meta.add(policyBadge(policy.canAutoApprove(room, user)));
         meta.getStyle().set("font-size", "0.8rem");

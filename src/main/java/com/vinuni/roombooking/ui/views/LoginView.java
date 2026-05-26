@@ -64,11 +64,11 @@ public class LoginView extends VerticalLayout {
         // Larger base font for everything in this view (labels, inputs, hint).
         getStyle().set("font-size", "var(--lumo-font-size-l)");
 
-        Image logo = new Image("images/vinuni-logo.png", "VinUni Room Booking");
-        logo.setWidth("260px");
+        Image logo = new Image("images/vinuni-logo.png", "Room Booking");
+        logo.setWidth("320px");
         logo.getStyle().set("margin-bottom", "1rem");
 
-        H1 title = new H1("VinUni Room Booking");
+        H1 title = new H1("Room Booking");
         title.getStyle().set("font-size", "2.25rem").set("margin", "0 0 0.25em 0");
         Paragraph hint = new Paragraph(
                 "Demo accounts (password \"pass\"): alice (student), bob (staff), carol (admin).");

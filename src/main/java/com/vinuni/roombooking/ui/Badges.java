@@ -8,10 +8,10 @@ import com.vinuni.roombooking.enums.RoomStatus;
 /**
  * Colored status pills used in grid columns across the views.
  *
- * Uses Vaadin Lumo's built-in {@code badge success / badge error} theme variants
- * for green/red. Orange (used for transitional states like OCCUPIED / PENDING)
- * isn't a stock Lumo variant, so it's styled inline against the Lumo warning
- * tokens that ship with the theme.
+ * Uses inline styles (rather than Vaadin's {@code theme="badge"} attribute)
+ * so the pill renders correctly in every context — including the ComboBox
+ * overlay used by the room picker, where Lumo's badge theme styling does
+ * not always propagate into the overlay's stamping scope.
  *
  * <p>Color contract:
  * <ul>
@@ -64,30 +64,39 @@ public final class Badges {
     }
 
     private static Span green(String text) {
-        Span s = new Span(text);
-        s.getElement().getThemeList().add("badge success");
-        return s;
+        return pill(text, "hsl(145, 55%, 88%)", "hsl(145, 65%, 25%)");
     }
 
     private static Span red(String text) {
-        Span s = new Span(text);
-        s.getElement().getThemeList().add("badge error");
-        return s;
+        return pill(text, "hsl(0, 75%, 92%)", "hsl(0, 70%, 35%)");
     }
 
-    /** Orange — Vaadin Lumo doesn't ship a warning badge, so we hand-roll one. */
     private static Span orange(String text) {
-        Span s = new Span(text);
-        s.getElement().getThemeList().add("badge");
-        s.getStyle()
-                .set("background-color", "hsl(28, 100%, 92%)")
-                .set("color", "hsl(28, 80%, 30%)");
-        return s;
+        return pill(text, "hsl(28, 100%, 92%)", "hsl(28, 80%, 30%)");
     }
 
     private static Span neutral(String text) {
+        return pill(text, "hsl(0, 0%, 92%)", "hsl(0, 0%, 30%)");
+    }
+
+    /**
+     * Consistent pill shape across colors. Inline so the styles survive
+     * shadow-DOM scopes like ComboBox overlays where theme attributes
+     * don't always inherit Lumo's badge CSS.
+     */
+    private static Span pill(String text, String background, String color) {
         Span s = new Span(text);
-        s.getElement().getThemeList().add("badge contrast");
+        s.getStyle()
+                .set("display", "inline-flex")
+                .set("align-items", "center")
+                .set("background", background)
+                .set("color", color)
+                .set("padding", "2px 8px")
+                .set("border-radius", "999px")
+                .set("font-size", "0.78rem")
+                .set("font-weight", "600")
+                .set("line-height", "1.4")
+                .set("white-space", "nowrap");
         return s;
     }
 }
