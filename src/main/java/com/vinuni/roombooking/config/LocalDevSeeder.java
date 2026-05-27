@@ -1,14 +1,15 @@
 package com.vinuni.roombooking.config;
 
-import com.vinuni.roombooking.model.Admin;
-import com.vinuni.roombooking.model.Staff;
-import com.vinuni.roombooking.model.Student;
-import com.vinuni.roombooking.service.DatabaseConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+
+import com.vinuni.roombooking.model.Admin;
+import com.vinuni.roombooking.model.Staff;
+import com.vinuni.roombooking.model.Student;
+import com.vinuni.roombooking.service.DatabaseConnector;
 
 /**
  * Seeds three demo users (alice / bob / carol — password "pass") into the
@@ -42,11 +43,17 @@ public class LocalDevSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        seedIfMissing(new Student("u-alice", "alice", "pass", "alice@vinuni.edu.vn",
+        seedIfMissing(new Student("25dung.lh", "dung", "pass", "25dung.lh@vinuni.edu.vn",
+                "S2024-001", "Data Science", 3));
+        seedIfMissing(new Student("25tam.lh", "tam", "pass", "25tam.lh@vinuni.edu.vn",
+                "S2024-001", "Data Science", 3));
+        seedIfMissing(new Student("25mien.ddh", "mien", "pass", "25mien.ddh@vinuni.edu.vn",
                 "S2024-001", "Computer Science", 3));
-        seedIfMissing(new Staff("u-bob", "bob", "pass", "bob@vinuni.edu.vn",
+        seedIfMissing(new Staff("an.nk", "an", "pass", "an.nk@vinuni.edu.vn",
                 "ST-001", "Library"));
-        seedIfMissing(new Admin("u-carol", "carol", "pass", "carol@vinuni.edu.vn",
+        seedIfMissing(new Staff("dung.nq", "qdung", "pass", "dung.nq@vinuni.edu.vn",
+                "ST-001", "Elab"));
+        seedIfMissing(new Admin("carol", "carol", "pass", "carol@vinuni.edu.vn",
                 "AD-001"));
     }
 
