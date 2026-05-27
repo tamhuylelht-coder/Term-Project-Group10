@@ -1,12 +1,18 @@
 package com.vinuni.roombooking.ui.views;
 
+import java.util.Locale;
+
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Image;
-import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.PasswordField;
@@ -17,12 +23,6 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.service.DatabaseConnector;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
-
-import java.util.Locale;
 
 /**
  * View 1 - Login.
@@ -70,12 +70,6 @@ public class LoginView extends VerticalLayout {
 
         H1 title = new H1("Room Booking");
         title.getStyle().set("font-size", "2.25rem").set("margin", "0 0 0.25em 0");
-        Paragraph hint = new Paragraph(
-                "Demo accounts (password \"pass\"): alice (student), bob (staff), carol (admin).");
-        hint.getStyle()
-                .set("color", "var(--lumo-secondary-text-color)")
-                .set("font-size", "1.05rem")
-                .set("margin-bottom", "1.5rem");
 
         // Field width bumped 320 -> 440. Taller inputs via --lumo-size-l.
         String fieldWidth = "440px";
@@ -102,7 +96,7 @@ public class LoginView extends VerticalLayout {
         loginBtn.addClickListener(e ->
                 attemptLogin(nameField.getValue(), pwdField.getValue()));
 
-        add(logo, title, hint, nameField, pwdField, loginBtn);
+        add(logo, title, nameField, pwdField, loginBtn);
     }
 
     private void attemptLogin(String rawName, String pwd) {
