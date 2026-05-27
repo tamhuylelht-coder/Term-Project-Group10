@@ -29,12 +29,6 @@ public abstract class User {
 
     public abstract String getUserType();
 
-    /**
-     * UML-mandated method. The live login flow uses Spring Security's
-     * BCrypt-backed {@code AuthenticationManager}; this method exists only
-     * so the diagram's signature is honored. Compares plaintext, so don't
-     * rely on it for real auth.
-     */
     public boolean authenticate(String pwd) {
         if (pwd == null || pwd.isEmpty()) return false;
         if (password == null || password.isEmpty()) return false;

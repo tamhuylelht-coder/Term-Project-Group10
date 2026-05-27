@@ -13,15 +13,6 @@ import com.vinuni.roombooking.enums.RoomStatus;
  * overlay used by the room picker, where Lumo's badge theme styling does
  * not always propagate into the overlay's stamping scope.
  *
- * <p>Color contract:
- * <ul>
- *   <li>Room AVAILABLE / Booking APPROVED / "Available now" → green</li>
- *   <li>Room OCCUPIED / Booking REJECTED / Booking CANCELLED → red</li>
- *   <li>Room MAINTENANCE / Booking PENDING → orange</li>
- *   <li>Invitation ACCEPTED → green, PENDING → orange, DECLINED → red</li>
- * </ul>
- * Every view that shows a status should route through one of these helpers
- * so the color rules stay consistent without copy-paste drift.
  */
 public final class Badges {
 

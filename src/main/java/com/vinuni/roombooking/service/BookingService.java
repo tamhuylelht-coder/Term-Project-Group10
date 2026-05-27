@@ -13,12 +13,6 @@ import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.repository.BookingRepository;
 import com.vinuni.roombooking.validator.BookingValidator;
 
-/**
- * PRIMARY CONTRACT between frontend and backend.
- * These three method signatures are FROZEN from Phase 1 — do not change them.
- *
- * Phase 2 owner: Huy Dung (logic) + Huy Tam (DB integration, May 15)
- */
 @Service
 public class BookingService {
 
@@ -36,10 +30,6 @@ public class BookingService {
         this.dbConnector = dbConnector;
         this.policy      = policy;
     }
-
-    // -------------------------------------------------------------------------
-    // CONTRACT METHODS — frontend depends on these exact signatures
-    // -------------------------------------------------------------------------
 
     /**
      * CONTRACT — Submit a booking request through validation and persist it.
@@ -103,9 +93,6 @@ public class BookingService {
 
     /**
      * CONTRACT — Cancel a booking if the requesting user owns it (or is Admin).
-     *
-     * STUB returns true unconditionally.
-     * Phase 2: verify ownership, set CANCELLED, persist.
      */
     public boolean cancelBooking(String bookingId, User user) {
         BookingRequest req = repository.findById(bookingId);
@@ -144,10 +131,6 @@ public class BookingService {
         dbConnector.updateBookingStatus(req);
         return BookingStatus.APPROVED;
     }
-
-    // -------------------------------------------------------------------------
-    // Internal helpers — not part of the frontend contract
-    // -------------------------------------------------------------------------
 
     /**
      * Drain the pending queue and decide APPROVED / REJECTED for each.

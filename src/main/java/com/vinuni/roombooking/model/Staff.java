@@ -33,7 +33,6 @@ public class Staff extends User implements Bookable {
     }
 
     /**
-     * STUB — Phase 2: build BookingRequest and delegate to BookingService.submitRequest().
      * Creates a new booking request for a room during a specific time slot.
      * 
      * @param room the Room to book
@@ -86,7 +85,6 @@ public class Staff extends User implements Bookable {
     }
 
     /**
-     * STUB — Phase 2: delegate to BookingService.cancelBooking(bookingId, this).
      * Cancels an existing booking if the requesting staff owns it.
      * 
      * @param bookingId the ID of the booking to cancel

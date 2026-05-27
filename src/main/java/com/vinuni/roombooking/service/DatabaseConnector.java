@@ -1,30 +1,37 @@
 package com.vinuni.roombooking.service;
 
-import com.vinuni.roombooking.model.BookingRequest;
-import com.vinuni.roombooking.model.Room;
-import com.vinuni.roombooking.model.TimeSlot;
-import com.vinuni.roombooking.model.User;
-import com.vinuni.roombooking.model.Student;
-import com.vinuni.roombooking.model.Staff;
-import com.vinuni.roombooking.model.Admin;
-import com.vinuni.roombooking.model.Invitation;
-import com.vinuni.roombooking.model.TimeSlot;
-import com.vinuni.roombooking.enums.RoomStatus;
-import com.vinuni.roombooking.enums.AccessLevel;
-import com.vinuni.roombooking.enums.BookingStatus;
-import com.vinuni.roombooking.enums.InvitationStatus;
-import com.vinuni.roombooking.repository.BookingRepository;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import java.sql.*;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.time.LocalDateTime;
+import com.vinuni.roombooking.enums.AccessLevel;
+import com.vinuni.roombooking.enums.BookingStatus;
+import com.vinuni.roombooking.enums.InvitationStatus;
+import com.vinuni.roombooking.enums.RoomStatus;
+import com.vinuni.roombooking.model.Admin;
+import com.vinuni.roombooking.model.BookingRequest;
+import com.vinuni.roombooking.model.Invitation;
+import com.vinuni.roombooking.model.Room;
+import com.vinuni.roombooking.model.Staff;
+import com.vinuni.roombooking.model.Student;
+import com.vinuni.roombooking.model.TimeSlot;
+import com.vinuni.roombooking.model.User;
+import com.vinuni.roombooking.repository.BookingRepository;
+
+import jakarta.annotation.PostConstruct;
 
 
 /**
@@ -73,11 +80,6 @@ public class DatabaseConnector {
         }
         
     }
-
-    /**
-     * STUB — Phase 2 (Huy Tam): SELECT * FROM bookings WHERE room_id = roomId.
-     * Returns null until implemented.
-     */
 
     /**
      * Persist a new Room. The {@code room.getRoomId()} value is ignored —
@@ -397,9 +399,6 @@ public class DatabaseConnector {
         }
     }
 
-    /**
-     * STUB — Phase 2 (Huy Tam): UPDATE rooms SET status = ? WHERE room_id = ?.
-     */
     public void updateRoomStatus(int roomId, RoomStatus status) {
         // TODO (Huy Tam): UPDATE rooms SET status = status.name() WHERE room_id = roomId
 
@@ -888,9 +887,6 @@ public class DatabaseConnector {
         return null;
     }
 
-    /**
-     * STUB — Phase 2 (Huy Tam): close connection gracefully.
-     */
     public void close() {
         try{
             if (connection != null && !connection.isClosed()){

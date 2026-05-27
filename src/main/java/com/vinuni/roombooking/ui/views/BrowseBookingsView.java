@@ -1,5 +1,11 @@
 package com.vinuni.roombooking.ui.views;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
@@ -20,20 +26,7 @@ import com.vinuni.roombooking.ui.MainLayout;
 import com.vinuni.roombooking.ui.SessionUtil;
 import com.vinuni.roombooking.ui.VaadinFrontendUI;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.stream.Collectors;
-
 /**
- * View 6 - Inbox (invite-only).
- *
- *   <b>Your invitations</b> — bookings the host invited you to.
- *   Accept / Decline buttons write to the invitations table; the booking
- *   no longer has a public self-RSVP path. PENDING sort to the top so the
- *   action items are obvious.
- *
  * Filters applied:
  *   - Past invitations (end time &lt; now) are hidden.
  *   - Invitations to CANCELLED / REJECTED bookings are hidden so the

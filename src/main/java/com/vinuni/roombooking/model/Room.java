@@ -1,4 +1,4 @@
-    package com.vinuni.roombooking.model;
+package com.vinuni.roombooking.model;
 
 import com.vinuni.roombooking.enums.AccessLevel;
 import com.vinuni.roombooking.enums.RoomStatus;
@@ -43,9 +43,6 @@ public class Room {
         this.status = status;
     }
 
-    /**
-     * STUB — Phase 2: check status == AVAILABLE (and optionally query DB for live occupancy).
-     */
     public boolean isAvailable() {
         return status == RoomStatus.AVAILABLE;
     }

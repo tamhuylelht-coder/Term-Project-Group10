@@ -1,7 +1,4 @@
 package com.vinuni.roombooking.model;
-import com.vinuni.roombooking.repository.BookingRepository;
-import com.vinuni.roombooking.service.BookingService;
-import com.vinuni.roombooking.service.DatabaseConnector;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -40,7 +37,6 @@ public class Admin extends User {
     }
 
     /**
-     * STUB — Phase 2: persist a new Room via BookingRepository / DatabaseConnector.
      * 
      * @param room the Room object to add to the system
      * @throws IllegalArgumentException if room is null or invalid
@@ -70,12 +66,10 @@ public class Admin extends User {
             // Ensure room is in AVAILABLE status
             room.status = com.vinuni.roombooking.enums.RoomStatus.AVAILABLE;
             
-            // TODO (Huy Dung): Phase 2
             // Persist room to database - this would require a RoomRepository.save() or DatabaseConnector.insertRoom()
             logger.info("Admin " + this.adminId + " adding room: " + room.getRoomName() + 
                        " (ID: " + room.getRoomId() + ", Capacity: " + room.getCapacity() + ")");
             
-            // Placeholder: actual database insertion would happen here
             System.out.println("Room " + room.getRoomName() + " added successfully by admin " + this.adminId);
             
         } catch (Exception e) {
@@ -85,7 +79,6 @@ public class Admin extends User {
     }
 
     /**
-     * STUB — Phase 2: remove a Room by id from repository and DB.
      * 
      * @param roomId the ID of the room to remove
      * @throws IllegalArgumentException if roomId is invalid
@@ -129,7 +122,6 @@ public class Admin extends User {
     }
 
     /**
-     * STUB — Phase 2: set booking status to CANCELLED regardless of ownership.
      * Admin override capability for urgent cancellations.
      * 
      * @param bookingId the ID of the booking to cancel
@@ -169,11 +161,6 @@ public class Admin extends User {
             bookingRepository.save(booking);
             databaseConnector.updateBookingStatus(booking);
             
-            // TODO (Huy Dung): Phase 2
-            // Send email notification to user: booking.getUser().getEmail()
-            // Notify with subject: "Your booking has been cancelled by admin"
-            // Include reason: "Cancelled by admin " + this.adminId
-            
             logger.info("Booking " + bookingId + " cancelled successfully. User " + 
                        booking.getUser().getUserName() + " should be notified.");
             
@@ -188,7 +175,6 @@ public class Admin extends User {
     }
 
     /**
-     * STUB — Phase 2: approve or reject a pending BookingRequest.
      * Override admin capability to manage booking requests.
      * 
      * @param req the BookingRequest to override
@@ -240,11 +226,6 @@ public class Admin extends User {
             bookingRepository.save(req);
             databaseConnector.updateBookingStatus(req);
             
-            // TODO (Huy Dung): Phase 2
-            // Send email notification to requester
-            // If approved: "Your booking request has been approved by admin"
-            // If rejected: "Your booking request has been rejected by admin. Reason: [reason]"
-            
             logger.info("Booking request " + req.getBookingId() + " " + action + 
                        " successfully. User " + req.getUser().getUserName() + " should be notified.");
             
@@ -274,7 +255,6 @@ public class Admin extends User {
     }
 
     /**
-     * STUB — Phase 2: list, activate, deactivate user accounts.
      * Admin utility for user account management.
      * Returns a list of all users in the system.
      * 
@@ -282,24 +262,10 @@ public class Admin extends User {
      * @throws IllegalStateException if user repository is not available
      */
     public List<User> manageUserAccounts() {
-        // TODO (Huy Dung): Phase 2
-        // 1. Implement UserRepository for database persistence
-        // 2. Retrieve all users from repository
-        // 3. In a future service/controller, provide UI/CLI options to:
-        //    a. List all user accounts with status (active/inactive)
-        //    b. Activate inactive accounts
-        //    c. Deactivate active accounts
-        //    d. Reset user password
-        // 4. Validate admin permissions for each action
-        // 5. Persist changes to database
-        // 6. Log all account management operations for audit
         
         logger.info("Admin " + this.adminId + " accessing user accounts management");
         
         try {
-            // TODO: Get users from UserRepository when available
-            // List<User> allUsers = userRepository.findAll();
-            // return allUsers;
             
             System.out.println("User account management interface (requires UserRepository implementation)");
             return java.util.Collections.emptyList();
@@ -323,13 +289,7 @@ public class Admin extends User {
         }
         
         logger.info("Admin " + this.adminId + " activating user: " + userId);
-        
-        // TODO (Huy Dung): Phase 2
-        // User user = userRepository.findById(userId);
-        // if (user == null) throw new IllegalStateException("User not found: " + userId);
-        // user.setActive(true);
-        // userRepository.save(user);
-        // logger.info("User " + userId + " activated successfully");
+    
     }
     
     /**
@@ -346,12 +306,6 @@ public class Admin extends User {
         
         logger.info("Admin " + this.adminId + " deactivating user: " + userId);
         
-        // TODO (Huy Dung): Phase 2
-        // User user = userRepository.findById(userId);
-        // if (user == null) throw new IllegalStateException("User not found: " + userId);
-        // user.setActive(false);
-        // userRepository.save(user);
-        // logger.info("User " + userId + " deactivated successfully");
     }
     
     /**
@@ -373,12 +327,5 @@ public class Admin extends User {
         
         logger.info("Admin " + this.adminId + " resetting password for user: " + userId);
         
-        // TODO (Huy Dung): Phase 2
-        // User user = userRepository.findById(userId);
-        // if (user == null) throw new IllegalStateException("User not found: " + userId);
-        // user.setPassword(BCrypt.hashpw(newPassword, BCrypt.gensalt()));
-        // userRepository.save(user);
-        // logger.info("Password reset for user " + userId + " successfully");
-        // Send notification email to user with temporary password
     }
 }

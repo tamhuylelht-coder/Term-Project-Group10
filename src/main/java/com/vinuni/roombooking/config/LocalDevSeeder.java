@@ -15,20 +15,6 @@ import com.vinuni.roombooking.service.DatabaseConnector;
  * Seeds three demo users (alice / bob / carol — password "pass") into the
  * H2 dev datasource so the LoginView demo accounts work end-to-end without
  * a real MySQL server.
- *
- * <p>Scope:
- * <ul>
- *   <li><b>Local profile only</b> — gated by {@code @Profile("local")}, so it never
- *       runs against the real MySQL datasource and never replaces real DB data.</li>
- *   <li><b>Backfill for DemoData removal</b> — when the in-memory {@code DemoData}
- *       seeder was deleted, local H2 had no users at all. This restores the three
- *       canonical demo accounts the UI's hint paragraph advertises.</li>
- *   <li><b>Idempotent</b> — skips any user that already exists, so it's safe to
- *       run on every boot and after partial wipes.</li>
- * </ul>
- *
- * <p>Real production seed of the users table should go through MySQL directly
- * (e.g. a one-time SQL script run by the DBA), not through this class.
  */
 @Component
 @Profile("local")
