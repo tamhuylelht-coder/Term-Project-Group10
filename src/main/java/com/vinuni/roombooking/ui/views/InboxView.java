@@ -32,9 +32,9 @@ import com.vinuni.roombooking.ui.VaadinFrontendUI;
  *   - Invitations to CANCELLED / REJECTED bookings are hidden so the
  *     invitee can't Accept a dead meeting.
  */
-@Route(value = "browse", layout = MainLayout.class)
+@Route(value = "inbox", layout = MainLayout.class)
 @PageTitle("Inbox")
-public class BrowseBookingsView extends VerticalLayout {
+public class InboxView extends VerticalLayout {
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH);
@@ -47,7 +47,7 @@ public class BrowseBookingsView extends VerticalLayout {
     private final Paragraph invitesEmpty = new Paragraph(
             "No invitations waiting. When someone invites you to a booking, you'll see it here.");
 
-    public BrowseBookingsView(DatabaseConnector db,
+    public InboxView(DatabaseConnector db,
                               BookingService service,
                               VaadinFrontendUI frontend) {
         this.db = db;
