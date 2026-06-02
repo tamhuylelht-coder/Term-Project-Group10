@@ -21,7 +21,7 @@ import com.vaadin.flow.router.RouterLink;
 import com.vinuni.roombooking.model.Admin;
 import com.vinuni.roombooking.model.User;
 import com.vinuni.roombooking.ui.views.AdminView;
-import com.vinuni.roombooking.ui.views.BrowseBookingsView;
+import com.vinuni.roombooking.ui.views.InboxView;
 import com.vinuni.roombooking.ui.views.CalendarView;
 import com.vinuni.roombooking.ui.views.LoginView;
 import com.vinuni.roombooking.ui.views.MyBookingsView;
@@ -56,7 +56,7 @@ public class MainLayout extends AppLayout implements BeforeEnterObserver {
         HorizontalLayout nav = new HorizontalLayout(
                 styledNav(new RouterLink("Calendar", CalendarView.class)),
                 styledNav(new RouterLink("My Bookings", MyBookingsView.class)),
-                styledNav(new RouterLink("Inbox", BrowseBookingsView.class))
+                styledNav(new RouterLink("Inbox", InboxView.class))
         );
         if (SessionUtil.getCurrentUser() instanceof Admin) {
             nav.add(buildAdminMenu());
